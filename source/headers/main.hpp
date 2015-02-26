@@ -2,10 +2,15 @@
 #ifndef MAIN_HPP
 #define MAIN_HPP
 
+/*Macro definitions*/
+/*---------------------------------------------*/
+#define cimg_use_jpeg
+/*---------------------------------------------*/
 
 /*Included headers*/
 /*---------------------------------------------*/
 #include "errorlogger.hpp"
+#include "CImg.h"
 /*---------------------------------------------*/
 
 /*Included dependencies*/

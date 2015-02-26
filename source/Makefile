@@ -7,10 +7,10 @@ program_CXX_SRCS := $(wildcard *.cpp)
 program_OBJS := ${program_CXX_SRCS:.cpp=.o}
 
 
-SDL_LIB = -L/usr/local/lib -lSDL2 -lSDL2_gfx -lSDL2_ttf -Wl,-rpath=/usr/local/lib 
+SDL_LIB = -Wl,-rpath=/usr/local/lib 
 program_INCLUDE_DIRS := current_dir ./headers/
-program_LIBRARY_DIRS :=
-program_LIBRARIES :=  m
+program_LIBRARY_DIRS := /usr/local/lib /usr/X11R6/lib
+program_LIBRARIES :=  m pthread jpeg X11 SDL2 SDL2_gfx SDL2_ttf
 
 LDFLAGS += $(SDL_LIB)
 CXXFLAGS += -Wall -g -std=c++11
