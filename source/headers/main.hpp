@@ -20,6 +20,7 @@
 #include <SDL2/SDL.h>
 #include <fstream>
 #include <unistd.h>
+#include <set>
 /*---------------------------------------------*/
 
 using namespace cimg_library;
@@ -30,6 +31,8 @@ namespace SDLconsts {
 }
 
 namespace CImgconsts {
+	const float LOW_THRESHOLD_SCALE = 0.60;
+	const float HIGH_THRESHOLD_SCALE = 0.05;
 	const float RED_SCALE = 0.2989;
 	const float GREEN_SCALE = 0.5870;
 	const float BLUE_SCALE = 0.1140;
@@ -61,7 +64,12 @@ namespace CImgconsts {
 	const int GAUSSIAN_OFFSET_FROM_CENTER = 2;
 }
 	
-
+class Point{
+public:
+	int x;
+	int y;
+	bool operator <(const Point& p) const {return this->x < p.x;}
+};
 
 
 
@@ -77,6 +85,14 @@ void calculate_gradient_magnitude_and_direction(CImg<double>& grayimage,
 void apply_non_maximum_suppress(CImg<double>& grayimage, 
 								CImg<unsigned char>& direction, 
 								CImg<double>& magnitude);
+bool check_if_a_neghbour_is_upper_threshold(int xpos, 
+											int ypos, 
+											CImg<double>& supressed,
+											double high_threshold, 
+											double low_threshold,
+											std::set<Point>& visited_pixels);
+void hysteresis(CImg<double>& edges, CImg<double>& supressed, double high_threshold);
+double get_high_threshold(CImg<double>& supressed);
 
 void pollevent(bool& var);
 

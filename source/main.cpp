@@ -33,13 +33,13 @@ int main(int argc, char** argv){
 	CImg<double> image(argv[1]);
 	CImg<double> grayscale1(image.width(), image.height(), image.depth(), 1);
 	CImg<double> grayscale2(image.width(), image.height(), image.depth(), 1);
+	CImg<double> edges(image.width(), image.height(), image.depth(), 1);
 	CImg<unsigned char> direction(image.width(), image.height(), image.depth(), 1);
 	CImg<double> magnitude(image.width(), image.height(), image.depth(), 1);
 	convert_to_greyscale(image, grayscale1);
 	convert_to_greyscale(image, grayscale2);
 
 	for(int i = 0; i < ((int)argv[2][0] - '0'); i++){
-		apply_gaussian_smoothing(grayscale1);
 		apply_gaussian_smoothing(grayscale2);
 	}
 
@@ -52,16 +52,96 @@ int main(int argc, char** argv){
 								direction, 
 								magnitude);
 
+	hysteresis(edges, grayscale2, get_high_threshold(grayscale2));
 	
 	grayscale1.save("grayscale1.bmp");
 	grayscale2.save("grayscale2.bmp");
 	magnitude.save("magnitude.bmp");
-	direction.save("direction.bmp");
+	direction.save("edges.bmp");
 		
-	(image, direction, magnitude, grayscale1, grayscale2).display("RGB to Grayscale");
+	(image, grayscale1, magnitude, edges).display("RGB to Grayscale");
 
 	waitForEvent();
 	
+}
+
+void hysteresis(CImg<double>& edges, CImg<double>& supressed, double high_threshold){
+	double low_threshold = high_threshold*CImgconsts::LOW_THRESHOLD_SCALE;
+	for (int x = 1; x < supressed.width()-1; x++){
+		for (int y = 1; y < supressed.height()-1; y++){
+			if(supressed(x,y) > high_threshold){
+				edges(x,y) = 255;
+			}
+			else if (supressed(x,y) < low_threshold) {
+				edges(x,y) = 0;
+			}
+			else{
+				std::set<Point> visited_pixels;
+				if(check_if_a_neghbour_is_upper_threshold(x, 
+														y, 
+														supressed, 
+														high_threshold, 
+														low_threshold, 
+														visited_pixels)){
+					edges(x,y) = 255;
+				}
+				else{
+					edges(x,y) = 0;
+				}
+			}
+		}
+	}
+}
+
+bool check_if_a_neghbour_is_upper_threshold(int xpos, 
+											int ypos, 
+											CImg<double>& supressed,
+											double high_threshold, 
+											double low_threshold,
+											std::set<Point>& visited_pixels){
+	Point this_pixel = {xpos, ypos};
+	visited_pixels.insert(this_pixel);
+	for (int i = -1; i <= 1; i++){
+		for (int j = -1; j <= 1; j++){
+			if(xpos+i < 2 || ypos+j < 2 || xpos+i > supressed.width()-2 || ypos+j > supressed.height()-2){
+				continue;
+			}
+			Point current = {xpos + i, ypos + j};
+			if(visited_pixels.find(current) != visited_pixels.end()){
+				continue;
+			}
+			else if(supressed(xpos + i, ypos + j) > high_threshold){
+				return true;
+			}
+			else if (supressed(xpos + i, ypos + j) < low_threshold){
+				visited_pixels.insert(current);
+				continue;
+			}
+			else{
+				if(check_if_a_neghbour_is_upper_threshold(xpos + i, 
+														ypos + j, 
+														supressed, 
+														high_threshold, 
+														low_threshold, 
+														visited_pixels)){
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+double get_high_threshold(CImg<double>& supressed){
+	double high_threshold = 0;
+	for (int x = 1; x < supressed.width()-1; x++){
+		for (int y = 1; y < supressed.height()-1; y++){
+			if(supressed(x,y) > high_threshold){
+				high_threshold = supressed(x,y);
+			}
+		}
+	}
+	return high_threshold * CImgconsts::HIGH_THRESHOLD_SCALE;
 }
 
 void apply_non_maximum_suppress(CImg<double>& grayimage, 
@@ -232,8 +312,8 @@ void apply_gaussian_smoothing(CImg<double>& grayimage) {
 	for (int i = 0; i < grayimage.width(); i++){
 		for (int j = 0; j < grayimage.height(); j++){
 			pixel_sum = 0.0;
-			for (int k = -CImgconsts::GAUSSIAN_OFFSET_FROM_CENTER; k < CImgconsts::GAUSSIAN_OFFSET_FROM_CENTER; k++){
-				for (int l = -CImgconsts::GAUSSIAN_OFFSET_FROM_CENTER; l < CImgconsts::GAUSSIAN_OFFSET_FROM_CENTER; l++) {
+			for (int k = -CImgconsts::GAUSSIAN_OFFSET_FROM_CENTER; k <= CImgconsts::GAUSSIAN_OFFSET_FROM_CENTER; k++){
+				for (int l = -CImgconsts::GAUSSIAN_OFFSET_FROM_CENTER; l <= CImgconsts::GAUSSIAN_OFFSET_FROM_CENTER; l++) {
 					if (i+k > grayimage.width() || i+k < 0 || j+l > grayimage.height() || j+l < 0) {
 						continue;
 					}
