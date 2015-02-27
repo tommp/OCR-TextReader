@@ -30,18 +30,27 @@ int main(int argc, char** argv){
 		return 1;
 	}*/
 
-	CImg<unsigned char> image(argv[1]);
-	CImg<unsigned char> grayscale1(image.width(), image.height(), image.depth(), 1);
-	CImg<unsigned char> grayscale2(image.width(), image.height(), image.depth(), 1);
+	CImg<double> image(argv[1]);
+	CImg<double> grayscale1(image.width(), image.height(), image.depth(), 1);
+	CImg<double> grayscale2(image.width(), image.height(), image.depth(), 1);
 	CImg<unsigned char> direction(image.width(), image.height(), image.depth(), 1);
 	CImg<double> magnitude(image.width(), image.height(), image.depth(), 1);
-	//convert_to_greyscale(image, grayscale1);
+	convert_to_greyscale(image, grayscale1);
 	convert_to_greyscale(image, grayscale2);
-	apply_gaussian_smoothing(grayscale2);
+
+	for(int i = 0; i < ((int)argv[2][0] - '0'); i++){
+		apply_gaussian_smoothing(grayscale1);
+		apply_gaussian_smoothing(grayscale2);
+	}
+
 
 	calculate_gradient_magnitude_and_direction(grayscale2, 
 												direction, 
 												magnitude);
+
+	apply_non_maximum_suppress(grayscale2, 
+								direction, 
+								magnitude);
 
 	
 	grayscale1.save("grayscale1.bmp");
@@ -49,57 +58,89 @@ int main(int argc, char** argv){
 	magnitude.save("magnitude.bmp");
 	direction.save("direction.bmp");
 		
-	(image,grayscale2, direction, magnitude).display("RGB to Grayscale");
+	(image, direction, magnitude, grayscale1, grayscale2).display("RGB to Grayscale");
 
 	waitForEvent();
 	
 }
 
-void apply_non_maximum_suppress(CImg<unsigned char>& grayimage, 
+void apply_non_maximum_suppress(CImg<double>& grayimage, 
 								CImg<unsigned char>& direction, 
 								CImg<double>& magnitude){
 
 		for (int x = 1; x < grayimage.width()-1; x++){
 			for (int y = 1; y < grayimage.height()-1; y++){
-				switch((int)direction(x,y)){
+				switch(direction(x,y)){
 					case 0:
-						if(magnitude(x+1,y) > magnitude(x,y)){
+						if(magnitude(x+1,y) >= magnitude(x,y)){
 							grayimage(x,y) = 0;
 						}
-						break;
-					case 1:
-						if(magnitude(x+1,y-1) > magnitude(x,y)){
-							grayimage(x,y) = 0;
+						else{
+							grayimage(x,y) = magnitude(x,y);
 						}
 						break;
-					case 2:
-						if(magnitude(x,y-1) > magnitude(x,y)){
+					case 10:
+						if(magnitude(x+1,y-1) >= magnitude(x,y)){
 							grayimage(x,y) = 0;
 						}
-						break;
-					case 3:
-						if(magnitude(x-1,y-1) > magnitude(x,y)){
-							grayimage(x,y) = 0;
+						else{
+							grayimage(x,y) = magnitude(x,y);
 						}
 						break;
-					case 4:
-						if(magnitude(x-1,y) > magnitude(x,y)){
+					case 20:
+						if(magnitude(x,y-1) >= magnitude(x,y)){
 							grayimage(x,y) = 0;
 						}
-						break;
-					case 5:
-						if(magnitude(x-1,y+1) > magnitude(x,y)){
-							grayimage(x,y) = 0;
+						else{
+							grayimage(x,y) = magnitude(x,y);
 						}
 						break;
-					case 6:
-						if(magnitude(x,y+1) > magnitude(x,y)){
+					case 30:
+						if(magnitude(x-1,y-1) >= magnitude(x,y)){
 							grayimage(x,y) = 0;
 						}
+						else{
+							grayimage(x,y) = magnitude(x,y);
+						}
 						break;
-					case 7:
-						if(magnitude(x+1,y+1) > magnitude(x,y)){
+					case 40:
+						if(magnitude(x-1,y) >= magnitude(x,y)){
 							grayimage(x,y) = 0;
+						}
+						else{
+							grayimage(x,y) = magnitude(x,y);
+						}
+						break;
+					case 50:
+						if(magnitude(x-1,y+1) >= magnitude(x,y)){
+							grayimage(x,y) = 0;
+						}
+						else{
+							grayimage(x,y) = magnitude(x,y);
+						}
+						break;
+					case 60:
+						if(magnitude(x,y+1) >= magnitude(x,y)){
+							grayimage(x,y) = 0;
+						}
+						else{
+							grayimage(x,y) = magnitude(x,y);
+						}
+						break;
+					case 70:
+						if(magnitude(x+1,y+1) >= magnitude(x,y)){
+							grayimage(x,y) = 0;
+						}
+						else{
+							grayimage(x,y) = magnitude(x,y);
+						}
+						break;
+					case 80:
+						if(magnitude(x+1,y) >= magnitude(x,y)){
+							grayimage(x,y) = 0;
+						}
+						else{
+							grayimage(x,y) = magnitude(x,y);
 						}
 						break;
 				}
@@ -107,24 +148,24 @@ void apply_non_maximum_suppress(CImg<unsigned char>& grayimage,
 		}
 }
 
-void calculate_gradient_magnitude_and_direction(CImg<unsigned char>& grayimage, 
+void calculate_gradient_magnitude_and_direction(CImg<double>& grayimage, 
 												CImg<unsigned char>& direction, 
 												CImg<double>& magnitude) {
 
-	CImg<unsigned char> dx(grayimage.width(), grayimage.height(), grayimage.depth(), 1);
-	CImg<unsigned char> dy(grayimage.width(), grayimage.height(), grayimage.depth(), 1);
+	CImg<double> dx(grayimage.width(), grayimage.height(), grayimage.depth(), 1);
+	CImg<double> dy(grayimage.width(), grayimage.height(), grayimage.depth(), 1);
 	double aproxximate_direction = 0.0;
 	for (int x = 1; x < grayimage.width()-1; x++){
 		for (int y = 1; y < grayimage.height()-1; y++){
-			dx(x,y) = grayimage(x+1, y-1 ) * CImgconsts::GX[2][0] - grayimage(x-1, y-1 ) * CImgconsts::GX[0][0] + 
-						grayimage(x+1, y ) * CImgconsts::GX[2][1] - grayimage(x-1, y ) * CImgconsts::GX[0][1] + 
-						grayimage(x+1, y+1 ) * CImgconsts::GX[2][2] - grayimage(x-1, y+1 ) * CImgconsts::GX[0][2];
+			dx(x,y) = (grayimage(x+1, y-1 ) * CImgconsts::GX[2][0] + grayimage(x-1, y-1 ) * CImgconsts::GX[0][0] + 
+						grayimage(x+1, y ) * CImgconsts::GX[2][1] + grayimage(x-1, y ) * CImgconsts::GX[0][1] + 
+						grayimage(x+1, y+1 ) * CImgconsts::GX[2][2] + grayimage(x-1, y+1 ) * CImgconsts::GX[0][2]);
 
-			dy(x,y) = grayimage(x+1, y-1 ) * CImgconsts::GX[0][2] - grayimage(x-1, y-1 ) * CImgconsts::GX[0][0] + 
-						grayimage(x+1, y ) * CImgconsts::GX[1][2] - grayimage(x-1, y ) * CImgconsts::GX[1][0] + 
-						grayimage(x+1, y+1 ) * CImgconsts::GX[2][2] - grayimage(x-1, y+1 ) * CImgconsts::GX[2][0];
+			dy(x,y) = (grayimage(x+1, y-1 ) * CImgconsts::GX[0][2] + grayimage(x-1, y-1 ) * CImgconsts::GX[0][0] + 
+						grayimage(x+1, y ) * CImgconsts::GX[1][2] + grayimage(x-1, y ) * CImgconsts::GX[1][0] + 
+						grayimage(x+1, y+1 ) * CImgconsts::GX[2][2] + grayimage(x-1, y+1 ) * CImgconsts::GX[2][0]);
 
-			magnitude(x,y) = sqrt((double)dx(x,y)*(double)dx(x,y) + (double)dy(x,y)*(double)dy(x,y));
+			magnitude(x,y) = sqrt((dx(x,y)*dx(x,y)) + (dy(x,y)*dy(x,y)));
 
 
 			// [0, 45), [45, 90), [90, 135), [135,180), [180, 225), [225, 270), [270, 315), [315, 360)
@@ -139,10 +180,10 @@ void calculate_gradient_magnitude_and_direction(CImg<unsigned char>& grayimage,
 				aproxximate_direction = 0.0;
 			}
 			else if (dx(x,y) == 0) {
-				aproxximate_direction = atan((double)dy(x,y)/0.1);
+				aproxximate_direction = atan(dy(x,y)/0.1);
 			}
 			else{
-				aproxximate_direction = atan((double)dy(x,y)/(double)dx(x,y));
+				aproxximate_direction = atan(dy(x,y)/dx(x,y));
 			}
 
 			if(aproxximate_direction < 1.525243) {
@@ -176,7 +217,7 @@ void calculate_gradient_magnitude_and_direction(CImg<unsigned char>& grayimage,
 	}
 }
 
-void apply_gaussian_smoothing(CImg<unsigned char>& grayimage) {
+void apply_gaussian_smoothing(CImg<double>& grayimage) {
 
 	float gaussian_sum = 0.0;
 
@@ -203,22 +244,22 @@ void apply_gaussian_smoothing(CImg<unsigned char>& grayimage) {
 					}
 				}
 			}
-			grayimage(i, j) = round(pixel_sum/gaussian_sum);
+			grayimage(i, j) = pixel_sum/gaussian_sum;
 		}
 	}
 }
 
 /* Converts an image to grayscale using the luminocity method, it puts extra weight on green */
-void convert_to_greyscale(CImg<unsigned char>& image, CImg<unsigned char>& gray){
-	unsigned char red, green, blue;
+void convert_to_greyscale(CImg<double>& image, CImg<double>& gray){
+	double red, green, blue;
 	for (int x = 0; x < image.width(); x++){
 		for (int y = 0; y < image.height(); y++){
 			red = image(x,y,0, 0);
 			green = image(x,y,0, 1);
 			blue = image(x,y,0, 2);
-			gray(x,y) = round(((float)red * CImgconsts::RED_SCALE + 
-				(float)green * CImgconsts::GREEN_SCALE + 
-				(float)blue * CImgconsts::BLUE_SCALE)/3);
+			gray(x,y) = round((red * CImgconsts::RED_SCALE + 
+				green * CImgconsts::GREEN_SCALE + 
+				blue * CImgconsts::BLUE_SCALE)/3.0);
 		}
 	}
 }
