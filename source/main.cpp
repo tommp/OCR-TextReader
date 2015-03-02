@@ -5,7 +5,11 @@ int main(int argc, char** argv){
 	
 	CImg<unsigned char> edges(image.width(), image.height(), image.depth(), 1);
 
-	run_canny_edge_detection(image, edges);
+	run_canny_edge_detection(image, 
+							edges, 
+							CImgconsts::GAUSSIAN_SIZE, 
+							CImgconsts::GAUSSIAN_SIGMA, 
+							CImgconsts::HIGH_THRESHOLD_SCALE);
 	
 	edges.save("edges.jpg");
 		

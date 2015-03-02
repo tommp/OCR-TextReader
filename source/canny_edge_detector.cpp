@@ -1,19 +1,28 @@
 #include "./headers/canny_edge_detector.hpp"
 
-void run_canny_edge_detection(CImg<unsigned char>& image, CImg<unsigned char>& edges){
+void run_canny_edge_detection(CImg<unsigned char>& image, 
+								CImg<unsigned char>& edges, 
+								int gaussian_size, 
+								double sigma,
+								double high_threshold_scale){
 	CImg<unsigned char> grayscale(image.width(), image.height(), image.depth(), 1);
 	CImg<unsigned char> direction(image.width(), image.height(), image.depth(), 1);
 	CImg<double> magnitude(image.width(), image.height(), image.depth(), 1);
 
 	convert_to_greyscale(image, grayscale);
 
-	apply_gaussian_smoothing(grayscale, return_gaussian_kernel(5, 1), 5);
+	double** kernel = return_gaussian_kernel(gaussian_size, sigma);
+
+
+	apply_gaussian_smoothing(grayscale, kernel, gaussian_size);
+
+	delete_gaussian_kernel(kernel, gaussian_size);
 
 	calculate_gradient_magnitude_and_direction(grayscale, direction, magnitude);
 
 	apply_non_maximum_suppress(grayscale, direction, magnitude);
 
-	perform_hysteresis(edges, grayscale, CImgconsts::HIGH_THRESHOLD_SCALE*return_otsu_threshold(grayscale));
+	perform_hysteresis(edges, grayscale, round(high_threshold_scale*return_otsu_threshold(grayscale)));
 }
 
 /* Consider replacing with vector or dynarray (std) or put it in a class with its respective variables */
@@ -25,17 +34,19 @@ double** return_gaussian_kernel(int kernel_size, double sigma){
 
 	double mean = kernel_size/2;
 	double kernel_sum = 0.0;
-	for (int x = 0; x < kernel_size; x++) 
-	    for (int y = 0; y < kernel_size; y++) {
-	        kernel[x][y] = exp( -0.5 * (pow((x-mean)/sigma, 2.0) + pow((y-mean)/sigma,2.0)) )
-	                         / (2 * CImgconsts::PI * sigma * sigma);
-	        kernel_sum += kernel[x][y];
-	    }
+	for (int x = 0; x < kernel_size; x++) {
+		for (int y = 0; y < kernel_size; y++) {
+			kernel[x][y] = exp( -0.5 * (pow((x-mean)/sigma, 2.0) + pow((y-mean)/sigma,2.0)) )
+							 / (2 * CImgconsts::PI * sigma * sigma);
+			kernel_sum += kernel[x][y];
+		}
+	}
+
 
 	for (int x = 0; x < kernel_size; ++x){ 
-	    for (int y = 0; y < kernel_size; ++y){
-	        kernel[x][y] /= kernel_sum;
-	    }
+		for (int y = 0; y < kernel_size; ++y){
+			kernel[x][y] /= kernel_sum;
+		}
 	}
 	return kernel;
 }
@@ -52,7 +63,6 @@ int return_otsu_threshold(const CImg<unsigned char>& grayscale){
 	int histogram[CImgconsts::levels] = {0};
 	for (int x = 1; x < grayscale.width()-1; x++){
 		for (int y = 1; y < grayscale.height()-1; y++){
-			/* WARNING!!! SHOULD CHECK BOUNDS */
 			histogram[grayscale(x,y)]++;
 		}
 	}
@@ -296,7 +306,6 @@ void apply_gaussian_smoothing(CImg<unsigned char>& grayimage, double** gaussian,
 			grayimage(i, j) = round(pixel_sum/gaussian_sum);
 		}
 	}
-	delete_gaussian_kernel(gaussian, kernel_size);
 }
 
 /* Converts an image to grayscale using the luminocity method, it puts extra weight on green */
