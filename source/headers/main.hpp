@@ -31,22 +31,19 @@ namespace SDLconsts {
 }
 
 namespace CImgconsts {
-	const float LOW_THRESHOLD_SCALE = 0.60;
-	const float HIGH_THRESHOLD_SCALE = 0.05;
+	const int levels = 255;
+	const float LOW_THRESHOLD_SCALE = 0.50;
+	const float HIGH_THRESHOLD_SCALE = 1.f;
 	const float RED_SCALE = 0.2989;
 	const float GREEN_SCALE = 0.5870;
 	const float BLUE_SCALE = 0.1140;
 	const int GAUSSIAN_SIZE = 5;
+	const double GAUSSIAN_SIGMA = 1;
+
+	const double PI = 3.14159265358979323846;
 
 	/* Discrete approximation of a 2D gaussian function, stolen from wikipedia, standard deviation is  0.84089642 */
 	/* This is not neccessarily optimal, room for improvement here */
-	const float GAUSSIAN[5][5] = {
-		{0.017391304, 0.034782608, 0.04347826, 0.034782608, 0.017391304},
-		{0.034782608, 0.078260869, 0.104347826, 0.078260869, 0.034782608},
-		{0.04347826, 0.104347826, 0.130434782, 0.104347826, 0.04347826},
-		{0.034782608, 0.078260869, 0.104347826, 0.078260869, 0.034782608},
-		{0.017391304, 0.034782608, 0.04347826, 0.034782608, 0.017391304}
-	};
 
 	/* Convolution mask (x direction) for gradient calculation (sobel operator) */
 	const double GX[3][3] = {
@@ -61,7 +58,6 @@ namespace CImgconsts {
 		{0.0, 0.0, 0.0},
 		{1.0, 2.0, 1.0}
 	};
-	const int GAUSSIAN_OFFSET_FROM_CENTER = 2;
 }
 	
 class Point{
@@ -78,7 +74,7 @@ public:
 /*=============================================*/
 //LUMINOSITY METHOD: (0.21 R + 0.71 G + 0.07 B)
 void convert_to_greyscale(CImg<double>& image, CImg<double>& gray);
-void apply_gaussian_smoothing(CImg<double>& grayimage);
+void apply_gaussian_smoothing(CImg<double>& grayimage, double** gaussian, int kernel_size);
 void calculate_gradient_magnitude_and_direction(CImg<double>& grayimage, 
 												CImg<unsigned char>& direction, 
 												CImg<double>& magnitude);
@@ -91,8 +87,11 @@ bool check_if_a_neghbour_is_upper_threshold(int xpos,
 											double high_threshold, 
 											double low_threshold,
 											std::set<Point>& visited_pixels);
-void hysteresis(CImg<double>& edges, CImg<double>& supressed, double high_threshold);
-double get_high_threshold(CImg<double>& supressed);
+void perform_hysteresis(CImg<double>& edges, CImg<double>& supressed, double high_threshold);
+double return_otsu_threshold(const CImg<double>& grayscale);
+void delete_gaussian_kernel(double** kernel, int kernel_size);
+double** return_gaussian_kernel(int kernel_size, double sigma);
+void run_canny_edge_detection(CImg<double>& image, CImg<double>& edges);
 
 void pollevent(bool& var);
 
