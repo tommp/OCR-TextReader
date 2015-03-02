@@ -3,22 +3,19 @@
 
 
 int main(int argc, char** argv){
-	CImg<double> image(argv[1]);
+	CImg<unsigned char> image(argv[1]);
 	
-	CImg<double> edges(image.width(), image.height(), image.depth(), 1);
+	CImg<unsigned char> edges(image.width(), image.height(), image.depth(), 1);
 
 	run_canny_edge_detection(image, edges);
 	
 	edges.save("edges.jpg");
 		
-	(image, edges).display("Edge detection");
-
-	waitForEvent();
-	
+	(image, edges).display("Edge detection", false);
 }
 
-void run_canny_edge_detection(CImg<double>& image, CImg<double>& edges){
-	CImg<double> grayscale(image.width(), image.height(), image.depth(), 1);
+void run_canny_edge_detection(CImg<unsigned char>& image, CImg<unsigned char>& edges){
+	CImg<unsigned char> grayscale(image.width(), image.height(), image.depth(), 1);
 	CImg<unsigned char> direction(image.width(), image.height(), image.depth(), 1);
 	CImg<double> magnitude(image.width(), image.height(), image.depth(), 1);
 
@@ -65,12 +62,12 @@ void delete_gaussian_kernel(double** kernel, int kernel_size) {
 }
 /*------------------------------------------------------------------------*/
 
-double return_otsu_threshold(const CImg<double>& grayscale){
+int return_otsu_threshold(const CImg<unsigned char>& grayscale){
 	int histogram[CImgconsts::levels] = {0};
 	for (int x = 1; x < grayscale.width()-1; x++){
 		for (int y = 1; y < grayscale.height()-1; y++){
 			/* WARNING!!! SHOULD CHECK BOUNDS */
-			histogram[(int)floor(grayscale(x,y))]++;
+			histogram[grayscale(x,y)]++;
 		}
 	}
 
@@ -81,7 +78,7 @@ double return_otsu_threshold(const CImg<double>& grayscale){
 	double number_of_pixels = grayscale.width()*grayscale.height();
 	double current_bcw = 0;
 	double max_bcw = -1;
-	double threshold = 0;
+	int threshold = 0;
 
 	for (int i = 0; i < CImgconsts::levels; i++){
 		Wb_counter = 0.f;
@@ -119,11 +116,14 @@ double return_otsu_threshold(const CImg<double>& grayscale){
 	}
 }
 
-void perform_hysteresis(CImg<double>& edges, CImg<double>& supressed, double high_threshold){
-	double low_threshold = high_threshold*CImgconsts::LOW_THRESHOLD_SCALE;
-	for (int x = 1; x < supressed.width()-1; x++){
-		for (int y = 1; y < supressed.height()-1; y++){
-			if(supressed(x,y) > high_threshold){
+void perform_hysteresis(CImg<unsigned char>& edges, CImg<unsigned char>& supressed, int high_threshold){
+	int low_threshold = high_threshold*CImgconsts::LOW_THRESHOLD_SCALE;
+	for (int x = 0; x < supressed.width(); x++){
+		for (int y = 0; y < supressed.height(); y++){
+			if ((x == 0) || (y == 0) || (x == supressed.width()-1) || (y == supressed.height()-1)){
+				edges(x,y) = 0;
+			}
+			else if (supressed(x,y) > high_threshold){
 				edges(x,y) = 255;
 			}
 			else if (supressed(x,y) < low_threshold) {
@@ -149,9 +149,9 @@ void perform_hysteresis(CImg<double>& edges, CImg<double>& supressed, double hig
 
 bool check_if_a_neghbour_is_upper_threshold(int xpos, 
 											int ypos, 
-											CImg<double>& supressed,
-											double high_threshold, 
-											double low_threshold,
+											CImg<unsigned char>& supressed,
+											int high_threshold, 
+											int low_threshold,
 											std::set<Point>& visited_pixels){
 	Point this_pixel = {xpos, ypos};
 	visited_pixels.insert(this_pixel);
@@ -186,56 +186,56 @@ bool check_if_a_neghbour_is_upper_threshold(int xpos,
 	return false;
 }
 
-void apply_non_maximum_suppress(CImg<double>& grayimage, 
+void apply_non_maximum_suppress(CImg<unsigned char>& grayimage, 
 								CImg<unsigned char>& direction, 
 								CImg<double>& magnitude){
 
-		for (int x = 1; x < grayimage.width()-1; x++){
-			for (int y = 1; y < grayimage.height()-1; y++){
-				switch(direction(x,y)){
-					case 0:
-						if(magnitude(x+1,y) > magnitude(x,y) || magnitude(x-1,y) > magnitude(x,y)){
-							grayimage(x,y) = 0;
-						}
-						else{
-							grayimage(x,y) = magnitude(x,y);
-						}
-						break;
-					case 10:
-						if(magnitude(x+1,y+1) > magnitude(x,y) || magnitude(x-1,y-1) > magnitude(x,y)){
-							grayimage(x,y) = 0;
-						}
-						else{
-							grayimage(x,y) = magnitude(x,y);
-						}
-						break;
-					case 20:
-						if(magnitude(x,y-1) > magnitude(x,y) || magnitude(x,y+1) > magnitude(x,y)){
-							grayimage(x,y) = 0;
-						}
-						else{
-							grayimage(x,y) = magnitude(x,y);
-						}
-						break;
-					case 30:
-						if(magnitude(x+1,y-1) > magnitude(x,y) || magnitude(x-1,y+1) > magnitude(x,y)){
-							grayimage(x,y) = 0;
-						}
-						else{
-							grayimage(x,y) = magnitude(x,y);
-						}
-						break;
-				}
+	for (int x = 1; x < grayimage.width()-1; x++){
+		for (int y = 1; y < grayimage.height()-1; y++){
+			switch(direction(x,y)){
+				case 0:
+					if(magnitude(x+1,y) > magnitude(x,y) || magnitude(x-1,y) > magnitude(x,y)){
+						grayimage(x,y) = 0;
+					}
+					else{
+						grayimage(x,y) = magnitude(x,y);
+					}
+					break;
+				case 10:
+					if(magnitude(x+1,y+1) > magnitude(x,y) || magnitude(x-1,y-1) > magnitude(x,y)){
+						grayimage(x,y) = 0;
+					}
+					else{
+						grayimage(x,y) = magnitude(x,y);
+					}
+					break;
+				case 20:
+					if(magnitude(x,y-1) > magnitude(x,y) || magnitude(x,y+1) > magnitude(x,y)){
+						grayimage(x,y) = 0;
+					}
+					else{
+						grayimage(x,y) = magnitude(x,y);
+					}
+					break;
+				case 30:
+					if(magnitude(x+1,y-1) > magnitude(x,y) || magnitude(x-1,y+1) > magnitude(x,y)){
+						grayimage(x,y) = 0;
+					}
+					else{
+						grayimage(x,y) = magnitude(x,y);
+					}
+					break;
 			}
 		}
+	}
 }
 
-void calculate_gradient_magnitude_and_direction(CImg<double>& grayimage, 
+void calculate_gradient_magnitude_and_direction(CImg<unsigned char>& grayimage, 
 												CImg<unsigned char>& direction, 
 												CImg<double>& magnitude) {
 
-	CImg<double> dx(grayimage.width(), grayimage.height(), grayimage.depth(), 1);
-	CImg<double> dy(grayimage.width(), grayimage.height(), grayimage.depth(), 1);
+	CImg<char> dx(grayimage.width(), grayimage.height(), grayimage.depth(), 1);
+	CImg<char> dy(grayimage.width(), grayimage.height(), grayimage.depth(), 1);
 	double aproxximate_direction = 0.0;
 	for (int x = 1; x < grayimage.width()-1; x++){
 		for (int y = 1; y < grayimage.height()-1; y++){
@@ -246,7 +246,7 @@ void calculate_gradient_magnitude_and_direction(CImg<double>& grayimage,
 			dy(x,y) = (grayimage(x-1, y+1 ) * CImgconsts::GY[2][0] + grayimage(x-1, y-1 ) * CImgconsts::GY[0][0] + 
 						grayimage(x, y+1 ) * CImgconsts::GY[2][1] + grayimage(x, y-1 ) * CImgconsts::GY[0][1] + 
 						grayimage(x+1, y+1 ) * CImgconsts::GY[2][2] + grayimage(x+1, y-1 ) * CImgconsts::GY[0][2]);
-			magnitude(x,y) = sqrt((dx(x,y)*dx(x,y)) + (dy(x,y)*dy(x,y)));
+			magnitude(x,y) = sqrt(((double)dx(x,y)*(double)dx(x,y)) + ((double)dy(x,y)*(double)dy(x,y)));
 			
 			if (dx(x,y) == 0) {
 				if (dy(x,y) == 0) {
@@ -257,7 +257,7 @@ void calculate_gradient_magnitude_and_direction(CImg<double>& grayimage,
 				}
 			}
 			else{
-				aproxximate_direction = (atan2(dy(x,y), dx(x,y))) * 180.f/CImgconsts::PI;
+				aproxximate_direction = (atan2((double)dy(x,y), (double)dx(x,y))) * 180.f/CImgconsts::PI;
 				if((aproxximate_direction < 23 && aproxximate_direction >= -22) ||
 					 (aproxximate_direction >= 158 && aproxximate_direction < -157)) {
 					direction(x,y) = 0;
@@ -279,7 +279,7 @@ void calculate_gradient_magnitude_and_direction(CImg<double>& grayimage,
 	}
 }
 
-void apply_gaussian_smoothing(CImg<double>& grayimage, double** gaussian, int kernel_size) {
+void apply_gaussian_smoothing(CImg<unsigned char>& grayimage, double** gaussian, int kernel_size) {
 
 	float gaussian_sum = 0.0;
 
@@ -289,7 +289,7 @@ void apply_gaussian_smoothing(CImg<double>& grayimage, double** gaussian, int ke
 		} 
 	}
 
-	float pixel_sum = 0.0;
+	double pixel_sum = 0.0;
 
 	int kernel_offset = kernel_size / 2;
 
@@ -302,20 +302,19 @@ void apply_gaussian_smoothing(CImg<double>& grayimage, double** gaussian, int ke
 						continue;
 					}
 					else{
-						pixel_sum += (grayimage(i + k, j + l) * 
-							gaussian[k + kernel_offset]
-												[l + kernel_offset]);
+						pixel_sum += ((double)grayimage(i + k, j + l) * 
+							gaussian[k + kernel_offset][l + kernel_offset]);
 					}
 				}
 			}
-			grayimage(i, j) = pixel_sum/gaussian_sum;
+			grayimage(i, j) = round(pixel_sum/gaussian_sum);
 		}
 	}
 	delete_gaussian_kernel(gaussian, kernel_size);
 }
 
 /* Converts an image to grayscale using the luminocity method, it puts extra weight on green */
-void convert_to_greyscale(CImg<double>& image, CImg<double>& gray){
+void convert_to_greyscale(CImg<unsigned char>& image, CImg<unsigned char>& gray){
 	double red, green, blue;
 	for (int x = 0; x < image.width(); x++){
 		for (int y = 0; y < image.height(); y++){
