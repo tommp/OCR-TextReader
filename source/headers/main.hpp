@@ -18,7 +18,6 @@
 /*---------------------------------------------*/
 #include <string>
 #include <iostream>
-#include <SDL2/SDL.h>
 #include <fstream>
 #include <unistd.h>
 #include <set>
@@ -36,9 +35,6 @@ namespace SDLconsts {
 
 /*Header content*/
 /*=============================================*/
-void pollevent(bool& var);
-
-void waitForEvent();
 /*=============================================*/
 
 #endif
