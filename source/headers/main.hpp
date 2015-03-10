@@ -13,12 +13,14 @@
 #include "CImg.h"
 #include "canny_edge_detector.hpp"
 #include "neural_network.hpp"
+
 /*---------------------------------------------*/
 
 /*Included dependencies*/
 /*---------------------------------------------*/
 #include <iostream>
 #include <time.h>
+#include <algorithm>
 /*---------------------------------------------*/
 
 using namespace cimg_library;
