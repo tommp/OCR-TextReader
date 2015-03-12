@@ -15,7 +15,7 @@ int main(int argc, char** argv){
 		scale -= std::min((int)round(1800.0/(float)image.height()*100.0), 100);
 	}
 
-	if (scale < -45) {
+	if (scale > -45) {
 		scale = -45;
 	}
 
