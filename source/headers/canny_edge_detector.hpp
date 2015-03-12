@@ -214,6 +214,9 @@ void perform_hysteresis(CImg<unsigned char>& edges, CImg<unsigned char>& supress
 			if ((x == 0) || (y == 0) || (x == supressed.width()-1) || (y == supressed.height()-1)){
 				edges(x,y) = 0;
 			}
+			else if ((x == 1) || (y == 1) || (x == supressed.width()-2) || (y == supressed.height()-2)){
+				edges(x,y) = 0;
+			}
 			else if (supressed(x,y) > high_threshold){
 				edges(x,y) = 255;
 			}
@@ -248,7 +251,7 @@ bool check_if_a_neghbour_is_upper_threshold(int xpos,
 	visited_pixels.insert(this_pixel);
 	for (int i = -1; i <= 1; i++){
 		for (int j = -1; j <= 1; j++){
-			if(xpos+i < 2 || ypos+j < 2 || xpos+i > supressed.width()-2 || ypos+j > supressed.height()-2){
+			if(xpos+i < 1 || ypos+j < 1 || xpos+i > supressed.width()-1 || ypos+j > supressed.height()-1){
 				continue;
 			}
 			Point current = {xpos + i, ypos + j};

@@ -13,7 +13,7 @@
 #include "CImg.h"
 #include "canny_edge_detector.hpp"
 #include "neural_network.hpp"
-
+#include "letter_segmentation.hpp"
 /*---------------------------------------------*/
 
 /*Included dependencies*/

@@ -1,7 +1,8 @@
 #include "./headers/main.hpp"
 
 int main(int argc, char** argv){
-	clock_t t1,t2,t3;
+	clock_t t1,t2,t3,t4;
+	srand (time(NULL));
 	t1 = clock();
 
 	CImg<unsigned char> image(argv[1]);
@@ -19,7 +20,8 @@ int main(int argc, char** argv){
 		scale = -45;
 	}
 
-	std::cout<<"Scaling set to: "<< scale <<" %%" <<std::endl;
+
+	std::cout<<"Scaling set to: "<< abs(scale) <<" %" <<std::endl;
 
 	/* nearest-neighbor interpolation for speed, switch last option to 5 for lossless (no lol)*/
 	image.resize(scale, scale,-100,-100,1);
@@ -33,10 +35,30 @@ int main(int argc, char** argv){
 							CImgconsts::GAUSSIAN_SIZE, 
 							CImgconsts::GAUSSIAN_SIGMA, 
 							CImgconsts::HIGH_THRESHOLD_SCALE);
-	t3=clock();
 	edges.save("edges.jpg");
-    std::cout<<"Runtime of canny edge detector: "<<((float)t3-(float)t2)/CLOCKS_PER_SEC<<std::endl;
-	std::cout<<"Runtime in total: "<<((float)t3-(float)t1)/CLOCKS_PER_SEC<<std::endl;
+
+	t3=clock();
+	std::cout<<"Runtime of canny edge detector: "<<((float)t3-(float)t2)/CLOCKS_PER_SEC<<std::endl;
+
+	std::vector<int> vertical_line_indexes;
+
+	remove_single_artifacts(edges, 0);
+	crop_empty_space(edges, 255, 0);
+	create_grid_separation(edges, vertical_line_indexes, 155, 255, 0);
+	segment_letters(edges, vertical_line_indexes, 155);
+
+	t4=clock();
+	std::cout<<"Runtime of image segmentation: "<<((float)t4-(float)t3)/CLOCKS_PER_SEC<<std::endl;
+
+	/* Network */
+	std::vector<unsigned int> topology;
+	topology.push_back(2200);/* Input nodes */
+	topology.push_back(1500);/* Hidden nodes */
+	topology.push_back(133);/* Output nodes, all ascii symbols plus norwegian letters */
+
+	Network nnet(topology);
+	
+	std::cout<<"Runtime in total: "<<((float)t4-(float)t1)/CLOCKS_PER_SEC<<std::endl;
 
 	(image, edges).display("Edge detection", false);
 }

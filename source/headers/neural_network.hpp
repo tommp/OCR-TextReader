@@ -39,8 +39,8 @@ public:
 };
 
 Connection::Connection(){
-	this->weight = 0.5;
-	this->delta_weight = 0.1;
+	this->weight = ((float)rand()) / ((float)(RAND_MAX));
+	this->delta_weight = ((float)rand()) / ((float)(RAND_MAX));
 }
 
 class Neuron{
