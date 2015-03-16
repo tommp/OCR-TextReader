@@ -148,7 +148,8 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value,
 
 void segment_letters(CImg<unsigned char>& gridded_img, 
 						std::vector<int>& vertical_line_indexes, 
-						unsigned char grid_value) {
+						unsigned char grid_value,
+						Network& nnet) {
 	int y_top;
 	int y_bottom;
 	int x_left;
@@ -177,13 +178,36 @@ void segment_letters(CImg<unsigned char>& gridded_img,
 				}
 				else {
 					x_right = x-1;
-					/* GET CROPPED IMAGE */
+					/* GET CROPPED IMAGE, CURRENTLY TESTING; MAKE PRETTY LATER*/
 					std::ostringstream sstream;
 					sstream << "../data/letters/"<< x_left << "x" << y_top << ".jpg";
 					std::string filename = sstream.str();
 
 					CImg<unsigned char> letter = gridded_img.get_crop(x_left, y_top+1, x_right, y_bottom-1);
 					crop_empty_space(letter, 255, 0);
+					
+					
+					std::vector<float> network_input;
+					int letter_size = letter.width() * letter.height();
+					
+					for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
+						for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
+							if (letter(letr_x,letr_y) == 255) {
+								network_input.push_back(1.0);
+							}
+							else {
+								network_input.push_back(0.0);
+							}
+						}
+					}
+					for (int neuron_number = 0; neuron_number < 2200-letter_size; neuron_number++) {
+						network_input.push_back(0.0);
+					}
+					
+
+					nnet.feed_forward(network_input);
+					
+					
 					letter.save(filename.c_str());
 
 					x_left = -1;

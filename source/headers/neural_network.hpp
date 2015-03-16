@@ -25,7 +25,7 @@ using namespace cimg_library;
 /*=============================================*/
 namespace ANNconsts {
 	const float eta = 0.1; // 0.0 = slow learner, 0.2 = medium learner, 1.0 = recless learner
-	const float alpha = 0.5; //0.0  = no monetum, 0.5 = moderate momentum
+	const float alpha = 0.5; //0.0  = no mometum, 0.5 = moderate momentum
 }
 class Neuron;
 class Network;
@@ -61,6 +61,19 @@ public:
 	float calculate_DOW(const Layer& next_layer) const;
 	void update_input_weights(Layer& previous_layer);
 };
+
+class Network{
+private:
+	std::vector<Layer> network_layers;
+	float error_sum;
+public:
+	Network(const std::vector<unsigned int>& topology);
+	void feed_forward(const std::vector<float>& input_values);
+	void back_propogation(const std::vector<float>& target_values);
+	void get_results(std::vector<float>& result_values)const;
+};
+
+/* Neuron members */
 
 void Neuron::update_input_weights(Layer& previous_layer) {
 
@@ -128,17 +141,7 @@ Neuron::Neuron(unsigned int number_of_outputs, unsigned int neuron_index) {
 	this->neuron_index = neuron_index;
 }
 
-class Network{
-private:
-	std::vector<Layer> network_layers;
-	float error_sum;
-public:
-	Network(const std::vector<unsigned int>& topology);
-	void feed_forward(const std::vector<float>& input_values);
-	void back_propogation(const std::vector<float>& target_values);
-	void get_results(std::vector<float>& result_values)const;
-};
-/*=============================================*/
+/* Network members */
 
 void Network::get_results(std::vector<float>& result_values)const {
 	result_values.clear();
@@ -198,7 +201,7 @@ void Network::feed_forward(const std::vector<float>& input_values) {
 	}
 
 	/* Feed forward */
-	for (unsigned int layer_number = 1; layer_number <network_layers.size(); layer_number++) {
+	for (unsigned int layer_number = 1; layer_number <network_layers.size()-1; layer_number++) {
 		Layer& previous_layer = network_layers[layer_number - 1];
 		for (unsigned int neuron_number = 0; neuron_number < network_layers.size() - 1; neuron_number++) {
 			network_layers[layer_number][neuron_number].feed_forward(previous_layer);
@@ -229,6 +232,10 @@ Network::Network(const std::vector<unsigned int>& topology) {
 
 		network_layers.back().back().set_output(1.0);
 	}
+}
+
+void train_network(Network& net) {
+	
 }
 
 #endif

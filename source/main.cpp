@@ -32,8 +32,8 @@ int main(int argc, char** argv){
 
 	run_canny_edge_detection(image, 
 							edges, 
-							CImgconsts::GAUSSIAN_SIZE, 
-							CImgconsts::GAUSSIAN_SIGMA, 
+							3, 
+							1, 
 							CImgconsts::HIGH_THRESHOLD_SCALE);
 	edges.save("edges.jpg");
 
@@ -42,21 +42,22 @@ int main(int argc, char** argv){
 
 	std::vector<int> vertical_line_indexes;
 
-	remove_single_artifacts(edges, 0);
-	crop_empty_space(edges, 255, 0);
-	create_grid_separation(edges, vertical_line_indexes, 155, 255, 0);
-	segment_letters(edges, vertical_line_indexes, 155);
-
-	t4=clock();
-	std::cout<<"Runtime of image segmentation: "<<((float)t4-(float)t3)/CLOCKS_PER_SEC<<std::endl;
-
 	/* Network */
 	std::vector<unsigned int> topology;
 	topology.push_back(2200);/* Input nodes */
 	topology.push_back(1500);/* Hidden nodes */
 	topology.push_back(133);/* Output nodes, all ascii symbols plus norwegian letters */
-
 	Network nnet(topology);
+
+	remove_single_artifacts(edges, 0);
+	crop_empty_space(edges, 255, 0);
+	create_grid_separation(edges, vertical_line_indexes, 155, 255, 0);
+	segment_letters(edges, vertical_line_indexes, 155, nnet);
+
+	t4=clock();
+	std::cout<<"Runtime of image segmentation: "<<((float)t4-(float)t3)/CLOCKS_PER_SEC<<std::endl;
+
+	
 	
 	std::cout<<"Runtime in total: "<<((float)t4-(float)t1)/CLOCKS_PER_SEC<<std::endl;
 
