@@ -49,6 +49,12 @@ int main(int argc, char** argv){
 	topology.push_back(133);/* Output nodes, all ascii symbols plus norwegian letters */
 	Network nnet(topology);
 
+	std::vector<int> output_neuron_indexes
+
+	for (int i = 0; i < 6; i++) {
+		output_neuron_indexes.push_back(i);
+	}
+
 	remove_single_artifacts(edges, 0);
 	crop_empty_space(edges, 255, 0);
 	create_grid_separation(edges, vertical_line_indexes, 155, 255, 0);

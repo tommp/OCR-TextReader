@@ -8,6 +8,7 @@
 /*Included headers*/
 /*---------------------------------------------*/
 #include "errorlogger.hpp"
+#include "CImg.h"
 /*---------------------------------------------*/
 
 /*Included dependencies*/
@@ -237,5 +238,7 @@ Network::Network(const std::vector<unsigned int>& topology) {
 void train_network(Network& net) {
 	
 }
+
+
 
 #endif

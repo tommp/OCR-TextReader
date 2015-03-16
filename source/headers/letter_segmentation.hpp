@@ -149,7 +149,8 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value,
 void segment_letters(CImg<unsigned char>& gridded_img, 
 						std::vector<int>& vertical_line_indexes, 
 						unsigned char grid_value,
-						Network& nnet) {
+						Network& nnet,
+						const std::vector<unsigned int>& topology) {
 	int y_top;
 	int y_bottom;
 	int x_left;
@@ -200,7 +201,7 @@ void segment_letters(CImg<unsigned char>& gridded_img,
 							}
 						}
 					}
-					for (int neuron_number = 0; neuron_number < 2200-letter_size; neuron_number++) {
+					for (int neuron_number = 0; neuron_number < topology[0]-letter_size; neuron_number++) {
 						network_input.push_back(0.0);
 					}
 					
@@ -215,6 +216,86 @@ void segment_letters(CImg<unsigned char>& gridded_img,
 				}
 			}
 		}
+	}
+}
+
+void generate_training_data(CImg<unsigned char>& gridded_img,
+							std::vector<int>& vertical_line_indexes, 
+							unsigned char grid_value,
+							const std::vector<int>& output_neuron_indexes,
+							const std::vector<unsigned int>& topology) {
+	std::ofstream training_data;
+	training_data.open ("trdata.txt");
+
+	int y_top;
+	int y_bottom;
+	int x_left;
+	int x_right;
+	int width = gridded_img.width();
+	int current_row = 0;
+
+	for (std::vector<int>::iterator it = vertical_line_indexes.begin(); it != vertical_line_indexes.end(); it++) {
+		y_top = *it;
+		if( it+1 == vertical_line_indexes.end()) {
+			y_bottom = gridded_img.height();
+		} 
+		else{
+			y_bottom = *(it+1);
+		}
+
+		x_left = -1;
+		x_right = -1;
+
+		for (int x = 0; x < width; x++) {
+			if (gridded_img(x, (*it)+4) == grid_value) {
+				if(x_left == -1) {
+					while((gridded_img(x, (*it)+4) == grid_value) && x < width) {
+						x++;
+					}
+					x_left = x;
+				}
+				else {
+					x_right = x-1;
+
+					CImg<unsigned char> letter = gridded_img.get_crop(x_left, y_top+1, x_right, y_bottom-1);
+					crop_empty_space(letter, 255, 0);
+					
+					std::vector<float> network_input;
+					int letter_size = letter.width() * letter.height();
+					
+					for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
+						for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
+							if (letter(letr_x,letr_y) == 255) {
+								training_data << 1.0;
+							}
+							else {
+								training_data << 0.0;
+							}
+						}
+					}
+					for (int neuron_number = 0; neuron_number < topology[0]-letter_size; neuron_number++) {
+						training_data << 0.0;
+					}
+					
+					training_data << "\n";
+
+					for (int i = 0; i < topology.back(); i++) {
+						if (i == output_neuron_indexes[current_row]) {
+							training_data << 1.0;
+						}
+						else {
+							training_data << 0.0;
+						}
+					}
+
+					training_data << "\n";
+
+					x_left = -1;
+					x_right = -1;
+				}
+			}
+		}
+		current_row++;
 	}
 }
 
