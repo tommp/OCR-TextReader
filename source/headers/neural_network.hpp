@@ -61,6 +61,7 @@ public:
 	void calculate_gradients(const Layer& next_layer);
 	float calculate_DOW(const Layer& next_layer) const;
 	void update_input_weights(Layer& previous_layer);
+	std::vector<Connection>* get_connections() {return &output_weights;}
 };
 
 class Network{
@@ -72,6 +73,8 @@ public:
 	void feed_forward(const std::vector<float>& input_values);
 	void back_propogation(const std::vector<float>& target_values);
 	void get_results(std::vector<float>& result_values)const;
+	void store_weights(std::string filename);
+	void load_weights(std::string filename);
 };
 
 /* Neuron members */
@@ -202,7 +205,7 @@ void Network::feed_forward(const std::vector<float>& input_values) {
 	}
 
 	/* Feed forward */
-	for (unsigned int layer_number = 1; layer_number <network_layers.size()-1; layer_number++) {
+	for (unsigned int layer_number = 1; layer_number < network_layers.size()-1; layer_number++) {
 		Layer& previous_layer = network_layers[layer_number - 1];
 		for (unsigned int neuron_number = 0; neuron_number < network_layers.size() - 1; neuron_number++) {
 			network_layers[layer_number][neuron_number].feed_forward(previous_layer);
@@ -234,11 +237,32 @@ Network::Network(const std::vector<unsigned int>& topology) {
 		network_layers.back().back().set_output(1.0);
 	}
 }
-
-void train_network(Network& net) {
-	
+void Network::store_weights(std::string filename) {
+	std::ofstream weights (filename);
+	for (auto layer =  network_layers.begin(); layer != network_layers.end(); layer++) {
+		for (auto neuron = layer->begin(); neuron != layer->end(); neuron++) {
+			for (auto connection = neuron->get_connections()->begin(); connection != neuron->get_connections()->end(); connection++) {
+				weights << connection->weight <<' '<< connection->delta_weight<<' ';
+			}
+		}
+	}
 }
-
+	
+void Network::load_weights(std::string filename){
+	std::ifstream weights (filename);
+	float weight;
+	float delta_weight;
+	for (auto layer =  network_layers.begin(); layer != network_layers.end(); layer++) {
+		for (auto neuron = layer->begin(); neuron != layer->end(); neuron++) {
+			for (auto connection = neuron->get_connections()->begin(); connection != neuron->get_connections()->end(); connection++) {
+				weights >> weight >> delta_weight;
+				connection->weight = weight;
+				connection->delta_weight = delta_weight;
+			}
+			
+		}
+	}
+}
 
 
 #endif

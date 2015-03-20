@@ -31,6 +31,7 @@ void create_grid_separation(CImg<unsigned char>& binary_img,
 	bool prev_was_gridline = false;
 
 	vertical_line_indexes.clear();
+	vertical_line_indexes.push_back(0);
 
 	for (int y = border; y < height - border; y++) {
 		for (int x = border; x < width; x++) {
@@ -53,7 +54,7 @@ void create_grid_separation(CImg<unsigned char>& binary_img,
 				if (binary_img(x,y) == plus_value) {
 					break;
 				}
-				else if (binary_img(x,y) == grid_value) {
+				else if (binary_img(x,y) == grid_value || y == (height - border - 1)) {
 					for (int y_draw = *it; y_draw < y; y_draw++) {
 						binary_img(x,y_draw) = grid_value;
 					}
@@ -179,17 +180,24 @@ void segment_letters(CImg<unsigned char>& gridded_img,
 				}
 				else {
 					x_right = x-1;
-					/* GET CROPPED IMAGE, CURRENTLY TESTING; MAKE PRETTY LATER*/
 					std::ostringstream sstream;
 					sstream << "../data/letters/"<< x_left << "x" << y_top << ".jpg";
 					std::string filename = sstream.str();
 
 					CImg<unsigned char> letter = gridded_img.get_crop(x_left, y_top+1, x_right, y_bottom-1);
 					crop_empty_space(letter, 255, 0);
+					letter.resize(-60, -60,-100,-100,1);
 					
 					
 					std::vector<float> network_input;
-					int letter_size = letter.width() * letter.height();
+					unsigned int letter_size = (unsigned int)letter.width() * (unsigned int)letter.height();
+
+					if (letter_size >= topology[0]) {
+						std::cout << "Letter too large, size: " << letter_size <<std::endl;
+						x_left = -1;
+						x_right = -1;
+						continue;
+					}
 					
 					for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
 						for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
@@ -201,7 +209,7 @@ void segment_letters(CImg<unsigned char>& gridded_img,
 							}
 						}
 					}
-					for (int neuron_number = 0; neuron_number < topology[0]-letter_size; neuron_number++) {
+					for (unsigned int neuron_number = 0; neuron_number < topology[0]-letter_size; neuron_number++) {
 						network_input.push_back(0.0);
 					}
 					
@@ -222,10 +230,11 @@ void segment_letters(CImg<unsigned char>& gridded_img,
 void generate_training_data(CImg<unsigned char>& gridded_img,
 							std::vector<int>& vertical_line_indexes, 
 							unsigned char grid_value,
-							const std::vector<int>& output_neuron_indexes,
-							const std::vector<unsigned int>& topology) {
-	std::ofstream training_data;
-	training_data.open ("trdata.txt");
+							const std::vector<unsigned int>& output_neuron_indexes,
+							const std::vector<unsigned int>& topology,
+							std::string filename) {
+	
+	std::ofstream training_data (filename);
 
 	int y_top;
 	int y_bottom;
@@ -259,9 +268,17 @@ void generate_training_data(CImg<unsigned char>& gridded_img,
 
 					CImg<unsigned char> letter = gridded_img.get_crop(x_left, y_top+1, x_right, y_bottom-1);
 					crop_empty_space(letter, 255, 0);
+					letter.resize(-60, -60,-100,-100,1);
 					
 					std::vector<float> network_input;
-					int letter_size = letter.width() * letter.height();
+					unsigned int letter_size = letter.width() * letter.height();
+
+					if (letter_size >= topology[0]) {
+						std::cout << "Letter too large, size: " << letter_size <<std::endl;
+						x_left = -1;
+						x_right = -1;
+						continue;
+					}
 					
 					for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
 						for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
@@ -273,13 +290,13 @@ void generate_training_data(CImg<unsigned char>& gridded_img,
 							}
 						}
 					}
-					for (int neuron_number = 0; neuron_number < topology[0]-letter_size; neuron_number++) {
+					for (unsigned int neuron_number = 0; neuron_number < topology[0]-letter_size; neuron_number++) {
 						training_data << 0.0;
 					}
 					
 					training_data << "\n";
 
-					for (int i = 0; i < topology.back(); i++) {
+					for (unsigned int i = 0; i < topology.back(); i++) {
 						if (i == output_neuron_indexes[current_row]) {
 							training_data << 1.0;
 						}
@@ -296,6 +313,38 @@ void generate_training_data(CImg<unsigned char>& gridded_img,
 			}
 		}
 		current_row++;
+	}
+}
+
+void train_network(std::string data_filename, Network& nnet, int number_of_loops) {
+
+
+	for (int i = 0; i < number_of_loops; i++) {
+		std::ifstream data (data_filename);
+		std::string input_line;
+		std::string output_line;
+		std::vector<float> target_values;
+		std::vector<float> input_values;
+
+		if(data.is_open()) {
+			while(std::getline(data, input_line)) {
+				std::getline(data, output_line);
+				for (auto it = output_line.begin(); it!=output_line.end(); it++) {
+					target_values.push_back((int)*it -'0');
+				}
+
+				for (auto it = input_line.begin(); it!=input_line.end(); it++) {
+					input_values.push_back((int)*it -'0');
+				}
+
+				nnet.feed_forward(input_values);
+				nnet.back_propogation(target_values);
+			}
+		}
+		else {
+			std::cout <<"Failed to open file: " << data_filename <<std::endl;
+		}
+		data.close();
 	}
 }
 

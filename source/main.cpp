@@ -44,27 +44,32 @@ int main(int argc, char** argv){
 
 	/* Network */
 	std::vector<unsigned int> topology;
-	topology.push_back(2200);/* Input nodes */
-	topology.push_back(1500);/* Hidden nodes */
+	topology.push_back(5000);/* Input nodes */
+	topology.push_back(2500);/* Hidden nodes */
 	topology.push_back(133);/* Output nodes, all ascii symbols plus norwegian letters */
 	Network nnet(topology);
-
-	std::vector<int> output_neuron_indexes
-
-	for (int i = 0; i < 6; i++) {
-		output_neuron_indexes.push_back(i);
+	nnet.load_weights("weights.txt");
+	for (int i = 0; i < 20; i++) {
+		train_network("training_data.txt", nnet, 10);
+		nnet.store_weights("weights.txt");
 	}
+	/*
+	std::vector<unsigned int> output_neuron_indexes;
 
-	remove_single_artifacts(edges, 0);
-	crop_empty_space(edges, 255, 0);
-	create_grid_separation(edges, vertical_line_indexes, 155, 255, 0);
-	segment_letters(edges, vertical_line_indexes, 155, nnet);
+	for (int i = 45; i < 57; i++) {
+		output_neuron_indexes.push_back(i);
+	}*/
+
+	//remove_single_artifacts(edges, 0);
+	//crop_empty_space(edges, 255, 0);
+	//create_grid_separation(edges, vertical_line_indexes, 155, 255, 0);
+	//segment_letters(edges, vertical_line_indexes, 155, nnet, topology);
+
+
 
 	t4=clock();
 	std::cout<<"Runtime of image segmentation: "<<((float)t4-(float)t3)/CLOCKS_PER_SEC<<std::endl;
 
-	
-	
 	std::cout<<"Runtime in total: "<<((float)t4-(float)t1)/CLOCKS_PER_SEC<<std::endl;
 
 	(image, edges).display("Edge detection", false);
