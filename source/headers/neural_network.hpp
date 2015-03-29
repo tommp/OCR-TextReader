@@ -18,251 +18,327 @@
 #include <unistd.h>
 #include <vector>
 #include <cmath>
+#include <assert.h>
+#include <cstdlib>
+#include <cassert>
+#include <sstream>
 /*---------------------------------------------*/
 
+using namespace std;
 using namespace cimg_library;
 
 /*Header content*/
 /*=============================================*/
 namespace ANNconsts {
-	const float eta = 0.1; // 0.0 = slow learner, 0.2 = medium learner, 1.0 = recless learner
-	const float alpha = 0.5; //0.0  = no mometum, 0.5 = moderate momentum
+	const double eta = 0.02; // 0.0 = slow learner, 0.2 = medium learner, 1.0 = recless learner
+	const double alpha = 0.0; //0.0  = no mometum, 0.5 = moderate momentum
 }
+
+struct Connection
+{
+	double weight;
+	double deltaWeight;
+};
+
+
 class Neuron;
-class Network;
-typedef std::vector<Neuron> Layer;
 
-class Connection {
+typedef vector<Neuron> Layer;
+
+class Neuron
+{
 public:
-	float weight;
-	float delta_weight;
-	Connection();
-};
+	Neuron(unsigned numOutputs, unsigned myIndex);
+	void setOutputVal(double val) { m_outputVal = val; }
+	double getOutputVal(void) const { return m_outputVal; }
+	void feedForward(const Layer &prevLayer);
+	void calcOutputGradients(double targetVal);
+	void calcHiddenGradients(const Layer &nextLayer);
+	void updateInputWeights(Layer &prevLayer);
+	vector<Connection>* get_connections() {return &m_outputWeights;}
 
-Connection::Connection(){
-	this->weight = ((float)rand()) / ((float)(RAND_MAX));
-	this->delta_weight = ((float)rand()) / ((float)(RAND_MAX));
-}
-
-class Neuron{
 private:
-	float outputvalue;
-	unsigned int neuron_index;
-	float gradient;
-	std::vector<Connection> output_weights;
-public:
-	Neuron(unsigned int number_of_outputs, unsigned int neuron_index);
-	float tranfer_function(float value);
-	float tranfer_function_derivative(float value);
-	void set_output(float new_outputvalue) {this->outputvalue = new_outputvalue;};
-	float get_output() const{return outputvalue;};
-	void feed_forward(const Layer& parent_neurons);
-	void calculate_output_gradients(float target_value);
-	void calculate_gradients(const Layer& next_layer);
-	float calculate_DOW(const Layer& next_layer) const;
-	void update_input_weights(Layer& previous_layer);
-	std::vector<Connection>* get_connections() {return &output_weights;}
+	static double eta;   // [0.0..1.0] overall net training rate
+	static double alpha; // [0.0..n] multiplier of last weight change (momentum)
+	static double transferFunction(double x);
+	static double transferFunctionDerivative(double x);
+	static double randomWeight(void) { return (double)rand() / double(RAND_MAX); }
+	double sumDOW(const Layer &nextLayer) const;
+	double m_outputVal;
+	vector<Connection> m_outputWeights;
+	unsigned m_myIndex;
+	double m_gradient;
 };
 
-class Network{
-private:
-	std::vector<Layer> network_layers;
-	float error_sum;
-public:
-	Network(const std::vector<unsigned int>& topology);
-	void feed_forward(const std::vector<float>& input_values);
-	void back_propogation(const std::vector<float>& target_values);
-	void get_results(std::vector<float>& result_values)const;
-	void store_weights(std::string filename);
-	void load_weights(std::string filename);
-};
+double Neuron::eta = ANNconsts::eta;    // overall net learning rate, [0.0..1.0]
+double Neuron::alpha = ANNconsts::alpha;   // momentum, multiplier of last deltaWeight, [0.0..1.0]
 
-/* Neuron members */
 
-void Neuron::update_input_weights(Layer& previous_layer) {
+void Neuron::updateInputWeights(Layer &prevLayer)
+{
+	// The weights to be updated are in the Connection container
+	// in the neurons in the preceding layer
 
-	for (unsigned int neuron_number = 0; neuron_number < previous_layer.size(); neuron_number++) {
-		Neuron& current_neuron = previous_layer[neuron_number];
+	for (unsigned n = 0; n < prevLayer.size(); ++n) {
+		Neuron &neuron = prevLayer[n];
+		double oldDeltaWeight = neuron.m_outputWeights[m_myIndex].deltaWeight;
 
-		float old_delta_weight = current_neuron.output_weights[neuron_index].delta_weight;
+		double newDeltaWeight =
+				// Individual input, magnified by the gradient and train rate:
+				eta * neuron.getOutputVal() * m_gradient
+				// Also add momentum = a fraction of the previous delta weight;
+				+ alpha * oldDeltaWeight;
 
-		float new_delta_weight = ANNconsts::eta * current_neuron.get_output() *gradient +
-								ANNconsts::alpha * old_delta_weight;
-
-		current_neuron.output_weights[neuron_index].delta_weight = new_delta_weight;
-		current_neuron.output_weights[neuron_index].weight += new_delta_weight;
+		neuron.m_outputWeights[m_myIndex].deltaWeight = newDeltaWeight;
+		neuron.m_outputWeights[m_myIndex].weight += newDeltaWeight;
 	}
 }
 
-float Neuron::calculate_DOW(const Layer& next_layer) const {
+double Neuron::sumDOW(const Layer &nextLayer) const
+{
+	double sum = 0.0;
 
-	float sum = 0.0;
+	// Sum our contributions of the errors at the nodes we feed.
 
-	for (unsigned int neuron_number = 0; neuron_number < next_layer.size() - 1; neuron_number++) {
-		sum += output_weights[neuron_number].weight * next_layer[neuron_number].gradient;
+	for (unsigned n = 0; n < nextLayer.size() - 1; ++n) {
+		sum += m_outputWeights[n].weight * nextLayer[n].m_gradient;
 	}
 
 	return sum;
 }
 
-void Neuron::calculate_gradients(const Layer& next_layer) {
-	
-	float dow = calculate_DOW(next_layer);
-	gradient = dow * tranfer_function_derivative(outputvalue);
+void Neuron::calcHiddenGradients(const Layer &nextLayer)
+{
+	double dow = sumDOW(nextLayer);
+	m_gradient = dow * Neuron::transferFunctionDerivative(m_outputVal);
 }
 
-void Neuron::calculate_output_gradients(float target_value) {
-	float delta = target_value - outputvalue;
-	gradient = delta * tranfer_function_derivative(outputvalue);
-
+void Neuron::calcOutputGradients(double targetVal)
+{
+	double delta = targetVal - m_outputVal;
+	m_gradient = delta * Neuron::transferFunctionDerivative(m_outputVal);
 }
 
-float Neuron::tranfer_function(float value) {
-	return tanh(value);
+double Neuron::transferFunction(double x)
+{
+	// tanh - output range [-1.0..1.0]
+
+	return tanh(x);
 }
 
-
-float Neuron::tranfer_function_derivative(float value) {
-	return 1.0 - value*value;
+double Neuron::transferFunctionDerivative(double x)
+{
+	// tanh derivative
+	return 1.0 - x * x;
 }
 
-void Neuron::feed_forward(const Layer& parent_neurons) {
+void Neuron::feedForward(const Layer &prevLayer)
+{
+	double sum = 0.0;
 
-	float sum = 0;
+	// Sum the previous layer's outputs (which are our inputs)
+	// Include the bias node from the previous layer.
 
-	for (unsigned int neuron_number = 0; neuron_number < parent_neurons.size(); neuron_number++) {
-		sum += parent_neurons[neuron_number].get_output() * output_weights[neuron_index].weight;
+	for (unsigned n = 0; n < prevLayer.size(); ++n) {
+		sum += prevLayer[n].getOutputVal() *
+				prevLayer[n].m_outputWeights[m_myIndex].weight;
 	}
 
-	outputvalue = tranfer_function(sum);
+	m_outputVal = Neuron::transferFunction(sum);
 }
 
-Neuron::Neuron(unsigned int number_of_outputs, unsigned int neuron_index) {
-
-	for (unsigned int current_output = 0; current_output < number_of_outputs; current_output++) {
-		output_weights.push_back(Connection());
+Neuron::Neuron(unsigned numOutputs, unsigned myIndex)
+{
+	for (unsigned c = 0; c < numOutputs; ++c) {
+		m_outputWeights.push_back(Connection());
+		m_outputWeights.back().weight = randomWeight();
+		m_outputWeights.back().deltaWeight = 0.00;
 	}
-	this->neuron_index = neuron_index;
+
+	m_myIndex = myIndex;
 }
 
-/* Network members */
 
-void Network::get_results(std::vector<float>& result_values)const {
-	result_values.clear();
+// ****************** class Net ******************
+class Net
+{
+public:
+	Net(const vector<unsigned> &topology);
+	void feedForward(const vector<double> &inputVals);
+	void backProp(const vector<double> &targetVals);
+	void getResults(vector<double> &resultVals) const;
+	double getRecentAverageError(void) const { return m_recentAverageError; }
+	int store_weights(std::string filename);
+	int load_weights(std::string filename);
 
-	for (unsigned int output_number = 0; output_number < network_layers.back().size() - 1; output_number++) {
-		result_values.push_back(network_layers.back()[output_number].get_output());
+private:
+	vector<Layer> m_layers;
+	double m_error;
+	double m_recentAverageError;
+	static double m_recentAverageSmoothingFactor;
+};
+
+
+double Net::m_recentAverageSmoothingFactor = 100.0; // Number of training samples to average over
+
+
+void Net::getResults(vector<double> &resultVals) const
+{
+	resultVals.clear();
+
+	for (unsigned n = 0; n < m_layers.back().size() - 1; ++n) {
+		resultVals.push_back(m_layers.back()[n].getOutputVal());
 	}
 }
 
-void Network::back_propogation(const std::vector<float>& target_values) {
+void Net::backProp(const vector<double> &targetVals)
+{
+	// Calculate overall net error (RMS of output neuron errors)
 
-	Layer& output_layer = network_layers.back();
-	error_sum = 0.0;
+	Layer &outputLayer = m_layers.back();
+	m_error = 0.0;
 
-	double current_error = 0.0;
+	for (unsigned n = 0; n < outputLayer.size() - 1; ++n) {
+		double delta = targetVals[n] - outputLayer[n].getOutputVal();
+		m_error += delta * delta;
+	}
+	m_error /= outputLayer.size() - 1; // get average error squared
+	m_error = sqrt(m_error); // RMS
 
-	for (unsigned int output_number = 0; output_number < output_layer.size()-1; output_number++) {
-		current_error = target_values[output_number] - output_layer[output_number].get_output();
-		error_sum += current_error;
+	// Implement a recent average measurement
+
+	m_recentAverageError =
+			(m_recentAverageError * m_recentAverageSmoothingFactor + m_error)
+			/ (m_recentAverageSmoothingFactor + 1.0);
+
+	// Calculate output layer gradients
+
+	for (unsigned n = 0; n < outputLayer.size() - 1; ++n) {
+		outputLayer[n].calcOutputGradients(targetVals[n]);
 	}
 
-	error_sum /= output_layer.size() - 1;
-	error_sum = sqrt(error_sum); /*RMS*/
+	// Calculate hidden layer gradients
 
-	for (unsigned int output_number = 0; output_number < output_layer.size()-1; output_number++) {
-		output_layer[output_number].calculate_output_gradients(target_values[output_number]);
-	}
+	for (unsigned layerNum = m_layers.size() - 2; layerNum > 0; --layerNum) {
+		Layer &hiddenLayer = m_layers[layerNum];
+		Layer &nextLayer = m_layers[layerNum + 1];
 
-	for (unsigned int layer_number = network_layers.size() - 2; layer_number > 0; layer_number--) {
-
-		Layer& current_layer = network_layers[layer_number];
-		Layer& next_layer = network_layers[layer_number + 1];
-
-		for (unsigned int neuron_number = 0; neuron_number < current_layer.size(); neuron_number++) {
-
-			current_layer[neuron_number].calculate_gradients(next_layer);
+		for (unsigned n = 0; n < hiddenLayer.size(); ++n) {
+			hiddenLayer[n].calcHiddenGradients(nextLayer);
 		}
 	}
 
-	for (unsigned int layer_number = network_layers.size() - 1; layer_number > 0; layer_number--) {
+	// For all layers from outputs to first hidden layer,
+	// update connection weights
 
-		Layer& current_layer = network_layers[layer_number];
-		Layer& previous_layer = network_layers[layer_number - 1];
+	for (unsigned layerNum = m_layers.size() - 1; layerNum > 0; --layerNum) {
+		Layer &layer = m_layers[layerNum];
+		Layer &prevLayer = m_layers[layerNum - 1];
 
-		for (unsigned int neuron_number = 0; neuron_number < current_layer.size(); neuron_number++) {
-			current_layer[neuron_number].update_input_weights(previous_layer);
-		}
-
-	}
-}
-
-void Network::feed_forward(const std::vector<float>& input_values) {
-
-	/* Set input values */
-	for (unsigned int input_number = 0; input_number < input_values.size(); input_number++) {
-		network_layers[0][input_number].set_output(input_values[input_number]);
-	}
-
-	/* Feed forward */
-	for (unsigned int layer_number = 1; layer_number < network_layers.size()-1; layer_number++) {
-		Layer& previous_layer = network_layers[layer_number - 1];
-		for (unsigned int neuron_number = 0; neuron_number < network_layers.size() - 1; neuron_number++) {
-			network_layers[layer_number][neuron_number].feed_forward(previous_layer);
+		for (unsigned n = 0; n < layer.size() - 1; ++n) {
+			layer[n].updateInputWeights(prevLayer);
 		}
 	}
 }
 
-Network::Network(const std::vector<unsigned int>& topology) {
+void Net::feedForward(const vector<double> &inputVals)
+{
+	assert(inputVals.size() == m_layers[0].size() - 1);
 
-	unsigned int number_of_layers = topology.size();
-	unsigned int number_of_output_neurons = 0;
+	// Assign (latch) the input values into the input neurons
+	for (unsigned i = 0; i < inputVals.size(); ++i) {
+		m_layers[0][i].setOutputVal(inputVals[i]);
+	}
 
-	for (unsigned int layer_number = 0; layer_number < number_of_layers; layer_number++) {
-
-		network_layers.push_back(Layer());
-
-		if (layer_number == number_of_layers - 1) {
-			number_of_output_neurons = 0;
-		} 
-		else {
-			number_of_output_neurons = topology[layer_number + 1];
+	// forward propagate
+	for (unsigned layerNum = 1; layerNum < m_layers.size(); ++layerNum) {
+		Layer &prevLayer = m_layers[layerNum - 1];
+		for (unsigned n = 0; n < m_layers[layerNum].size() - 1; ++n) {
+			m_layers[layerNum][n].feedForward(prevLayer);
 		}
-
-		for (unsigned int neuron_number = 0; neuron_number <= topology[layer_number]; neuron_number++) {
-
-			network_layers.back().push_back(Neuron(number_of_output_neurons, neuron_number));
-		}
-
-		network_layers.back().back().set_output(1.0);
 	}
 }
-void Network::store_weights(std::string filename) {
+
+Net::Net(const vector<unsigned> &topology)
+{
+	unsigned numLayers = topology.size();
+	for (unsigned layerNum = 0; layerNum < numLayers; ++layerNum) {
+		m_layers.push_back(Layer());
+		unsigned numOutputs = layerNum == topology.size() - 1 ? 0 : topology[layerNum + 1];
+
+		// We have a new layer, now fill it with neurons, and
+		// add a bias neuron in each layer.
+		for (unsigned neuronNum = 0; neuronNum <= topology[layerNum]; ++neuronNum) {
+			m_layers.back().push_back(Neuron(numOutputs, neuronNum));
+		}
+
+		// Force the bias node's output to 1.0 (it was the last neuron pushed in this layer):
+		m_layers.back().back().setOutputVal(1.0);
+	}
+}
+
+int Net::store_weights(std::string filename) {
 	std::ofstream weights (filename);
-	for (auto layer =  network_layers.begin(); layer != network_layers.end(); layer++) {
+	if (! weights.is_open()) {
+		std::cout << "Unable to open file: " << filename << std::endl;
+		return -1;
+	}
+
+	weights << m_layers.size() << ' ';
+
+	for (auto& layer : m_layers) {
+		weights << layer.size() << ' ';
+	}
+
+	for (auto layer =  m_layers.begin(); layer != m_layers.end(); layer++) {
 		for (auto neuron = layer->begin(); neuron != layer->end(); neuron++) {
 			for (auto connection = neuron->get_connections()->begin(); connection != neuron->get_connections()->end(); connection++) {
-				weights << connection->weight <<' '<< connection->delta_weight<<' ';
+				weights << connection->weight <<' '<< connection->deltaWeight<<' ';
 			}
 		}
 	}
+	return 0;
 }
 	
-void Network::load_weights(std::string filename){
+int Net::load_weights(std::string filename){
 	std::ifstream weights (filename);
-	float weight;
-	float delta_weight;
-	for (auto layer =  network_layers.begin(); layer != network_layers.end(); layer++) {
+
+	if(!weights.good()) {
+		std::cout << "File: " << filename << " does no exist!" << std::endl;
+		return -1;
+	}
+
+	double weight;
+	double delta_weight;
+
+	unsigned int num_layers;
+	unsigned int curr_layer_size;
+
+	weights >> num_layers;
+
+	if (num_layers != m_layers.size()){
+		std::cout << "Layer topology not compatible with file, aborting!" << std::endl;
+		return -1;
+	}
+	for (unsigned int i = 0; i < num_layers; i++) {
+		weights >> curr_layer_size;
+		if (curr_layer_size != m_layers[i].size()) {
+			std::cout << "Layer topology not compatible with file, aborting!" << std::endl;
+			std::cout << "Layer: " << i << " has the wrong number of neurons." << std::endl;
+			return -1;
+		}
+	}
+
+	for (auto layer =  m_layers.begin(); layer != m_layers.end(); layer++) {
 		for (auto neuron = layer->begin(); neuron != layer->end(); neuron++) {
 			for (auto connection = neuron->get_connections()->begin(); connection != neuron->get_connections()->end(); connection++) {
 				weights >> weight >> delta_weight;
 				connection->weight = weight;
-				connection->delta_weight = delta_weight;
+				connection->deltaWeight = delta_weight;
 			}
-			
 		}
 	}
+	return 0;
 }
-
 
 #endif

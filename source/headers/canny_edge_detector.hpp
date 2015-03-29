@@ -10,6 +10,7 @@
 /*---------------------------------------------*/
 #include "errorlogger.hpp"
 #include "CImg.h"
+#include "morphology.hpp"
 /*---------------------------------------------*/
 
 
@@ -32,9 +33,6 @@ namespace CImgconsts {
 	const int levels = 255;
 	const float HIGH_THRESHOLD_SCALE = 1.f;
 	const float LOW_THRESHOLD_SCALE = HIGH_THRESHOLD_SCALE*0.30;
-	const float RED_SCALE = 0.21;
-	const float GREEN_SCALE = 0.71;
-	const float BLUE_SCALE = 0.07;
 	const int GAUSSIAN_SIZE = 5;
 	const double GAUSSIAN_SIGMA = 1.5;
 
@@ -61,21 +59,6 @@ public:
 	int y;
 	bool operator <(const Point& p) const {return this->x < p.x;}
 };
-
-/* Converts an image to grayscale using the luminocity method, it puts extra weight on green */
-void convert_to_greyscale(CImg<unsigned char>& image, CImg<unsigned char>& gray){
-	double red, green, blue;
-	for (int x = 0; x < image.width(); x++){
-		for (int y = 0; y < image.height(); y++){
-			red = image(x,y,0, 0);
-			green = image(x,y,0, 1);
-			blue = image(x,y,0, 2);
-			gray(x,y) = round((red * CImgconsts::RED_SCALE + 
-				green * CImgconsts::GREEN_SCALE + 
-				blue * CImgconsts::BLUE_SCALE)/3.0);
-		}
-	}
-}
 
 void apply_gaussian_smoothing(CImg<unsigned char>& grayimage, double** gaussian, int kernel_size) {
 
@@ -372,13 +355,13 @@ void run_canny_edge_detection(CImg<unsigned char>& image,
 	CImg<unsigned char> magnitude(image.width(), image.height(), image.depth(), 1);
 
 	clock_t t1,t2,t3,t4,t5,t6;
-
+	std::cout<<"\nCanny computations:\n "<<std::endl;
 	t1 = clock();
 
 	convert_to_greyscale(image, grayscale);
 
 	t2 = clock();
-	std::cout<<"\nCanny computations:\n "<<std::endl;
+	
 	std::cout<<"Runtime of greyscale conversion: "<<((float)t2-(float)t1)/CLOCKS_PER_SEC<<std::endl;
 
 	double** kernel = return_gaussian_kernel(gaussian_size, sigma);
