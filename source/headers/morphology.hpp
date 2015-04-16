@@ -26,7 +26,7 @@
 namespace morphology {
 	const float RED_SCALE = 0.21;
 	const float GREEN_SCALE = 0.71;
-	const float BLUE_SCALE = 0.07/3;
+	const float BLUE_SCALE = 0.07;
 }
 using namespace cimg_library;
 class STRMask;
@@ -250,7 +250,7 @@ void convert_to_greyscale(CImg<unsigned char>& image, CImg<unsigned char>& gray)
 			blue = image(x,y,0, 2);
 			gray(x,y) = round((red * morphology::RED_SCALE + 
 				green * morphology::GREEN_SCALE + 
-				blue * morphology::BLUE_SCALE));
+				blue * morphology::BLUE_SCALE)/3);
 		}
 	}
 }

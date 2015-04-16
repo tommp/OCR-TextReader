@@ -7,6 +7,7 @@
 /*---------------------------------------------*/
 #include "CImg.h"
 #include "morphology.hpp"
+#include "canny_edge_detector.hpp"
 /*---------------------------------------------*/
 
 /*Included dependencies*/
@@ -15,9 +16,14 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <glob.h>
+#include <vector>
+#include <map>
 /*---------------------------------------------*/
-
-const int num_inputs = 5;
+namespace seg_consts {
+	const int num_inputs = 100;
+	const std::string folder_path = "../data/SD19/HSF_0/*";
+}
 
 /*Header content*/
 /*=============================================*/
@@ -176,7 +182,9 @@ void read_letters(CImg<unsigned char>& gridded_img,
 		x_right = -1;
 
 		for (int x = 0; x < width; x++) {
-			if (gridded_img(x, (*it)+4) == grid_value) {
+			if ((gridded_img(x, (*it)+4) == grid_value) || 
+				(x == 0 && gridded_img(x, (*it)+4) != grid_value) ||
+				(x == width-1)) {
 				if(x_left == -1) {
 					while((gridded_img(x, (*it)+4) == grid_value) && x < width) {
 						x++;
@@ -186,16 +194,30 @@ void read_letters(CImg<unsigned char>& gridded_img,
 				else {
 					x_right = x-1;
 
+					int letter_dimension = sqrt(topology[0]);
+
+					if (topology[0] % letter_dimension) {
+						std::cout << "Topology dimension of: " << topology[0] << 
+						" is invalid, must have a whole square root (ex. 100)\n" 
+						<< std::endl;
+						exit(0);
+					}
+
 					CImg<unsigned char> letter = gridded_img.get_crop(x_left, y_top+1, x_right, y_bottom-1);
 					crop_empty_space(letter, 255, 0);
-
-					CImg<unsigned char> network_letter = convert_to_static_size(letter, sqrt(topology[0]), sqrt(topology[0]));
-					
+					letter.resize(letter_dimension, letter_dimension,-100,-100,5);
+					for (int i = 0; i < letter.width(); i++) {
+						for (int j = 0; j < letter.height(); j++) {
+							if (letter(i,j)) {
+								letter(i,j) = 255;
+							}
+						}
+					}
 					std::vector<double> network_input;
 					
-					for(int letr_x = 0; letr_x < network_letter.width(); letr_x++) {
-						for(int letr_y = 0; letr_y < network_letter.height(); letr_y++) {
-							if (network_letter(letr_x,letr_y) == 255) {
+					for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
+						for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
+							if (letter(letr_x,letr_y) == 255) {
 								network_input.push_back(1.0);
 							}
 							else {
@@ -246,7 +268,9 @@ void segment_letters(CImg<unsigned char>& gridded_img,
 		x_right = -1;
 
 		for (int x = 0; x < width; x++) {
-			if (gridded_img(x, (*it)+4) == grid_value) {
+			if ((gridded_img(x, (*it)+4) == grid_value) || 
+				(x == 0 && gridded_img(x, (*it)+4) != grid_value) ||
+				(x == width-1)) {
 				if(x_left == -1) {
 					while((gridded_img(x, (*it)+4) == grid_value) && x < width) {
 						x++;
@@ -256,15 +280,21 @@ void segment_letters(CImg<unsigned char>& gridded_img,
 				else {
 					x_right = x-1;
 					std::ostringstream sstream;
-					sstream << "../data/letters/"<< x_left << "x" << y_top << ".JPG";
+					sstream << "../data/letters/"<< y_top << "x" << x_left << ".JPG";
 					std::string filename = sstream.str();
 
 					CImg<unsigned char> letter = gridded_img.get_crop(x_left, y_top+1, x_right, y_bottom-1);
 					crop_empty_space(letter, 255, 0);
-
-					CImg<unsigned char> network_letter = convert_to_static_size(letter, num_inputs, num_inputs);
+					letter.resize(seg_consts::num_inputs, seg_consts::num_inputs,-100,-100,5);
+					for (int i = 0; i < letter.width(); i++) {
+						for (int j = 0; j < letter.height(); j++) {
+							if (letter(i,j)) {
+								letter(i,j) = 255;
+							}
+						}
+					}
 					
-					network_letter.save(filename.c_str());
+					letter.save(filename.c_str());
 
 					x_left = -1;
 					x_right = -1;
@@ -272,96 +302,6 @@ void segment_letters(CImg<unsigned char>& gridded_img,
 			}
 		}
 	}
-}
-
-void generate_training_data(CImg<unsigned char>& gridded_img,
-							std::vector<int>& vertical_line_indexes, 
-							unsigned char grid_value,
-							const std::vector<unsigned int>& output_neuron_indexes,
-							const std::vector<unsigned int>& topology,
-							std::string filename) {
-	
-	std::ofstream training_data (filename);
-
-	int y_top;
-	int y_bottom;
-	int x_left;
-	int x_right;
-	int width = gridded_img.width();
-	int current_letter = 0;
-
-	for (std::vector<int>::iterator it = vertical_line_indexes.begin(); it != vertical_line_indexes.end(); it++) {
-		y_top = *it;
-		if( it+1 == vertical_line_indexes.end()) {
-			y_bottom = gridded_img.height();
-		} 
-		else{
-			y_bottom = *(it+1);
-		}
-
-		x_left = -1;
-		x_right = -1;
-
-		for (int x = 0; x < width; x++) {
-			if (gridded_img(x, (*it)+4) == grid_value) {
-				if(x_left == -1) {
-					while((gridded_img(x, (*it)+4) == grid_value) && x < width) {
-						x++;
-					}
-					x_left = x;
-				}
-				else {
-					x_right = x-1;
-
-					CImg<unsigned char> letter = gridded_img.get_crop(x_left, y_top+1, x_right, y_bottom-1);
-					crop_empty_space(letter, 255, 0);
-					letter.resize(-60, -60,-100,-100,1);
-
-					int letter_dimension = sqrt(topology[0]);
-
-					if (topology[0] % letter_dimension) {
-						std::cout << "Topology dimension of: " << topology[0] << 
-						" is invalid, must have a whole square root (ex. 100)\n" 
-						<< std::endl;
-						training_data.close();
-						exit(0);
-					}
-					
-					std::vector<double> network_input;
-					CImg<unsigned char> network_letter = convert_to_static_size(letter, letter_dimension, letter_dimension);
-					
-					for(int letr_x = 0; letr_x < network_letter.width(); letr_x++) {
-						for(int letr_y = 0; letr_y < network_letter.height(); letr_y++) {
-							if (network_letter(letr_x,letr_y) == 255) {
-								training_data << 1.0;
-							}
-							else {
-								training_data << 0.0;
-							}
-						}
-					}
-					
-					training_data << "\n";
-
-					for (unsigned int i = 0; i < topology.back(); i++) {
-						if (i == output_neuron_indexes[current_letter]) {
-							training_data << 1.0;
-						}
-						else {
-							training_data << 0.0;
-						}
-					}
-
-					training_data << "\n";
-
-					x_left = -1;
-					x_right = -1;
-					current_letter++;
-				}
-			}
-		}
-	}
-	training_data.close();
 }
 
 void train_network(std::string data_filename, Net& nnet) {
@@ -370,35 +310,137 @@ void train_network(std::string data_filename, Net& nnet) {
 	std::string output_line;
 	std::vector<double> target_values;
 	std::vector<double> input_values;
-	int counter = 1;
 	if(data.is_open()) {
 		while(std::getline(data, input_line)) {
 			std::getline(data, output_line);
-
+			//TODO::DO NOT CONVERT HERE, JUST USE STRING COMPARISON!!!!!!!!!!!!!!!!!!!!!!!!!1
 			for (auto& it : input_line) {
 				if (!((it) == '\n')){
-					input_values.push_back((double)((int)it -'0'));
+					int value = ((int)it -'0');
+					if (value == 1) {
+						input_values.push_back(0.5);
+					}
+					else {
+						input_values.push_back(-0.5);
+					}
 				}
 			}
 
 			for (auto& it : output_line) {
 				if (!((it) == '\n')){
-					target_values.push_back((double)((int)it -'0'));
+					int value = ((int)it -'0');
+					if (value == 1) {
+						target_values.push_back(0.5);
+					}
+					else {
+						target_values.push_back(-0.5);
+					}
 				}
 			}
-
+			//////////////////////////////////////////////////////////////////////////////////////////
 			nnet.feedForward(input_values);
 			nnet.backProp(target_values);
 			input_values.clear();
 			target_values.clear();
-
-			counter++;
 		}
 	}
 	else {
 		std::cout <<"Failed to open file: " << data_filename <<std::endl;
 	}
 	data.close();
+}
+
+std::vector<std::string> glob(const std::string& pat){
+    glob_t glob_result;
+    glob(pat.c_str(), GLOB_TILDE, NULL, &glob_result);
+    std::vector<std::string> ret;
+    for(unsigned int i=0; i<glob_result.gl_pathc; i++){
+        ret.push_back(string(glob_result.gl_pathv[i]));
+    }
+    globfree(&glob_result);
+    return ret;
+}
+
+std::vector<std::string> split_string(std::string text, std::string delimiter) {
+	size_t pos = 0;
+	std::vector<std::string> tokens;
+	std::string token;
+	while ((pos = text.find(delimiter)) != std::string::npos) {
+	    token = text.substr(0, pos);
+	    tokens.push_back(token);
+	    text.erase(0, pos + delimiter.length());
+	}
+	return tokens;
+}
+
+void load_symbolmap(std::map<char, std::string>& symbolmap, const std::string& filename){
+	std::ifstream symbols(filename);
+	std::string line;
+
+	while (getline(symbols, line)){
+		symbolmap[line[0]] = line.substr (1);
+	}
+}
+
+void generate_training_data_SD19(const std::vector<unsigned int>& topology,
+							std::string filename,
+							std::map<char,std::string>& symbolmap) {
+
+	int letter_dimension = sqrt(topology[0]);
+
+	std::ofstream training_data(filename);
+
+	if (topology[0] % letter_dimension) {
+		std::cout << "Topology dimension of: " << topology[0] << 
+		" is invalid, must have a whole square root (ex. 100)\n" << std::endl;
+		exit(0);
+	}
+
+	std::vector<std::string> folders = glob(seg_consts::folder_path);
+
+	for (auto& folder : folders) {
+		std::cout << "-- Generating data from folder: " << folder << std::endl;
+		std::stringstream builder;
+		builder << folder << "/HSF_0_*";
+		const std::string image_path = builder.str();
+		std::vector<std::string> images = glob(image_path);
+		int filenr = 0;
+		for (auto& file : images) {
+			CImg<unsigned char> image(file.c_str());
+			CImg<unsigned char> letter(image.width(), image.height(), image.depth(), 1);
+			convert_to_greyscale(image, letter);
+			convert_to_binary(letter, return_otsu_threshold(letter)); 
+			crop_empty_space(letter, 0, 0);
+			letter.resize(letter_dimension, letter_dimension, -100, -100, 5);
+			convert_to_binary(letter, return_otsu_threshold(letter)); 
+
+			std::stringstream namesave;
+			namesave << "../data/letters/" << filenr << ".jpg"; 
+			std::string filename_save = namesave.str();
+			letter.save(filename_save.c_str());
+			filenr ++;
+
+			for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
+				for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
+					if (letter(letr_x,letr_y) == 0) {
+						training_data << 1;
+					}
+					else {
+						training_data << 0;
+					}
+				}
+			}
+			
+			training_data << "\n";
+
+			char value = split_string(file, "_")[9][0];
+
+			training_data << symbolmap[value];
+
+			training_data << "\n";
+		}
+	}
+	training_data.close();
 }
 
 

@@ -30,8 +30,8 @@ using namespace cimg_library;
 /*Header content*/
 /*=============================================*/
 namespace ANNconsts {
-	const double eta = 0.02; // 0.0 = slow learner, 0.2 = medium learner, 1.0 = recless learner
-	const double alpha = 0.0; //0.0  = no mometum, 0.5 = moderate momentum
+	const double eta = 0.1; // 0.0 = slow learner, 0.2 = medium learner, 1.0 = recless learner
+	const double alpha = 0.25; //0.0  = no mometum, 0.5 = moderate momentum
 }
 
 struct Connection

@@ -21,18 +21,17 @@
 #include <fstream>
 #include <unistd.h>
 #include <set>
-#include <time.h>
 /*---------------------------------------------*/
-
-
-/*Header content*/
-/*=============================================*/
+//LUMINOSITY METHOD: (0.21 R + 0.71 G + 0.07 B)
 using namespace cimg_library;
 
 namespace CImgconsts {
 	const int levels = 255;
 	const float HIGH_THRESHOLD_SCALE = 1.f;
 	const float LOW_THRESHOLD_SCALE = HIGH_THRESHOLD_SCALE*0.30;
+	const float RED_SCALE = 0.21;
+	const float GREEN_SCALE = 0.71;
+	const float BLUE_SCALE = 0.07;
 	const int GAUSSIAN_SIZE = 5;
 	const double GAUSSIAN_SIGMA = 1.5;
 
@@ -59,6 +58,9 @@ public:
 	int y;
 	bool operator <(const Point& p) const {return this->x < p.x;}
 };
+
+/*Header content*/
+/*=============================================*/
 
 void apply_gaussian_smoothing(CImg<unsigned char>& grayimage, double** gaussian, int kernel_size) {
 
@@ -259,6 +261,7 @@ void perform_hysteresis(CImg<unsigned char>& edges, CImg<unsigned char>& supress
 	}
 }
 
+
 int return_otsu_threshold(const CImg<unsigned char>& grayscale){
 	int histogram[CImgconsts::levels] = {0};
 	for (int x = 1; x < grayscale.width()-1; x++){
@@ -274,7 +277,7 @@ int return_otsu_threshold(const CImg<unsigned char>& grayscale){
 	double number_of_pixels = grayscale.width()*grayscale.height();
 	double current_bcw = 0;
 	double max_bcw = -1;
-	int threshold = 0;
+	int threshold = -1;
 
 	for (int i = 0; i < CImgconsts::levels; i++){
 		Wb_counter = 0.f;
@@ -303,9 +306,10 @@ int return_otsu_threshold(const CImg<unsigned char>& grayscale){
 			}
 		}
 	}
-	if(threshold == 0){
-		std::cout << "You done fucked up m8" << std::endl;
-		exit(0);
+	if(threshold == -1){
+		std::cout << "Otsu thresholding failed, setting to: " << CImgconsts::levels/2 <<
+		 ", by default." << std::endl;
+		return CImgconsts::levels/2;
 	}
 	else{
 		return threshold;
@@ -344,6 +348,7 @@ void delete_gaussian_kernel(double** kernel, int kernel_size) {
 	}
 	delete[] kernel;
 }
+/*------------------------------------------------------------------------*/
 
 void run_canny_edge_detection(CImg<unsigned char>& image, 
 								CImg<unsigned char>& edges, 
@@ -354,15 +359,7 @@ void run_canny_edge_detection(CImg<unsigned char>& image,
 	CImg<unsigned char> direction(image.width(), image.height(), image.depth(), 1);
 	CImg<unsigned char> magnitude(image.width(), image.height(), image.depth(), 1);
 
-	clock_t t1,t2,t3,t4,t5,t6;
-	std::cout<<"\nCanny computations:\n "<<std::endl;
-	t1 = clock();
-
 	convert_to_greyscale(image, grayscale);
-
-	t2 = clock();
-	
-	std::cout<<"Runtime of greyscale conversion: "<<((float)t2-(float)t1)/CLOCKS_PER_SEC<<std::endl;
 
 	double** kernel = return_gaussian_kernel(gaussian_size, sigma);
 
@@ -370,24 +367,12 @@ void run_canny_edge_detection(CImg<unsigned char>& image,
 
 	delete_gaussian_kernel(kernel, gaussian_size);
 
-	t3 = clock();
-	std::cout<<"Runtime of gaussian smoothing: "<<((float)t3-(float)t2)/CLOCKS_PER_SEC<<std::endl;
-
 	calculate_gradient_magnitude_and_direction(grayscale, direction, magnitude);
-
-	t4 = clock();
-	std::cout<<"Runtime of magnitude and gradient calculation: "<<((float)t4-(float)t3)/CLOCKS_PER_SEC<<std::endl;
 
 	apply_non_maximum_suppress(grayscale, direction, magnitude);
 
-	t5 = clock();
-	std::cout<<"Runtime of none maximum suppress: "<<((float)t5-(float)t4)/CLOCKS_PER_SEC<<std::endl;
-
 	perform_hysteresis(edges, grayscale, round(high_threshold_scale*return_otsu_threshold(grayscale)));
-
-	t6 = clock();
-	std::cout<<"Runtime of otsu threshold and hysteresis: "<<((float)t6-(float)t5)/CLOCKS_PER_SEC<<std::endl;
-	std::cout<<"\nEnd of canny computations\n "<<std::endl;
 }
+
 /*=============================================*/
 #endif
