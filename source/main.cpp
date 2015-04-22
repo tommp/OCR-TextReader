@@ -5,15 +5,15 @@ int main(int argc, char** argv){
 	
 
 	if (argc < 2) {
-		std::cout << "Invlaid number of inputs: " << argc << std::endl;
+		std::cout << "Invalid number of inputs: " << argc << std::endl;
 		return -1;
 	}
 
 	srand (time(NULL));
 
 	std::vector<unsigned int> topology;
-	topology.push_back(400);// Input nodes
-	topology.push_back(100);
+	topology.push_back(1024);// Input nodes
+	topology.push_back(400);
 	topology.push_back(62);// Output nodes 
 	Net nnet(topology);
 
@@ -25,7 +25,47 @@ int main(int argc, char** argv){
 		generate_training_data_SD19(topology, "training_data.txt", symbolmap);
 		std::cout << "Training data generated!" << std::endl;
 	}
+	else if (argv[1][0] == 'w'){
+		std::cout<<"Restoring weights..."<<std::endl;
+		nnet.load_weights("weights.txt");
+		std::cout<<"Weights restored, commencing reading!"<<std::endl;
+
+		vector<double> inputVals;
+		vector<double> resultVals;
+
+		std::ifstream infile ("test_data.txt");
+		std::ofstream outfile ("result_test_data.txt");
+
+		std::string line;
+		while(getline(infile, line)) {
+			inputVals.clear();
+			resultVals.clear();
+			for(auto& it : line){
+				if (it == '1') {
+					inputVals.push_back(1.0);
+				}
+				else {
+					inputVals.push_back(0.0);
+				}
+			}
+			nnet.feed_forward(inputVals);
+			nnet.get_results(resultVals);
+			for(auto& it : resultVals) {
+				if (it < 0) {
+					outfile << 0 << ',';
+				}
+				else {
+					outfile << 1 << ',';
+				}
+				
+			}
+			outfile << "\n";
+		}
+		infile.close();
+		outfile.close();
+	}
 	else if (argv[1][0] == 't'){
+		clock_t t1, t2;
 		std::cout<<"Restoring weights..."<<std::endl;
 		try {
 			nnet.load_weights("weights.txt");
@@ -36,12 +76,17 @@ int main(int argc, char** argv){
 		}
 		
 		for (int i = 0; i < 1000000; i++) {
-			for (int j = 0; j < 1; j++) {
-				train_network("training_data.txt", nnet);
-			}
+			std::cout << "======= Started epoch number " << i + 1 << " =======" << std::endl;
+			t1 = clock();
+			train_network("training_data.txt", nnet);
 			nnet.store_weights("weights.txt");
-			std::cout<<"Recent average error: " << nnet.getRecentAverageError() << std::endl;
-			if (nnet.getRecentAverageError() < 0.0005) {
+			t2 = clock();
+			std::cout << "======= Epoch number " << i + 1 << " completed =======" << std::endl;
+			std::cout << "Time spent training: " <<((float)t2-(float)t1)/CLOCKS_PER_SEC << " seconds"<< std::endl;
+			std::cout <<"Recent average error: " << nnet.get_recent_average_error() << std::endl;
+			std::cout <<"Last iteration error: " << nnet.get_error() << std::endl;
+			std::cout << "======================================\n\n" << std::endl;
+			if (nnet.get_recent_average_error() < 0.05) {
 				break;
 			}
 		}

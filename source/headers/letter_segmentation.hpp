@@ -21,7 +21,7 @@
 #include <map>
 /*---------------------------------------------*/
 namespace seg_consts {
-	const int num_inputs = 100;
+	const int num_inputs = 1024;
 	const std::string folder_path = "../data/SD19/HSF_0/*";
 }
 
@@ -69,33 +69,6 @@ void create_grid_separation(CImg<unsigned char>& binary_img,
 					}
 					break;
 				}
-			}
-		}
-	}
-}
-
-void remove_single_artifacts(CImg<unsigned char>& binary_img, unsigned char negative_value) {
-	int has_neighbour = false;
-	for (int x = 1; x < binary_img.width()-1; x++) {
-		for (int y = 1; y < binary_img.height()-1; y++) {
-
-			if (binary_img(x,y-1) == negative_value && 
-				binary_img(x-1,y-1) == negative_value && 
-				binary_img(x-1,y) == negative_value &&
-				binary_img(x-1,y+1) == negative_value && 
-				binary_img(x,y+1) == negative_value &&
-				binary_img(x+1,y+1) == negative_value &&
-				binary_img(x+1,y) == negative_value &&
-				binary_img(x+1,y-1) == negative_value) {
-
-				has_neighbour = false;
-			}
-			else{
-				has_neighbour = true;
-			}
-
-			if(!has_neighbour) {
-				binary_img(x,y) = negative_value;
 			}
 		}
 	}
@@ -228,8 +201,8 @@ void read_letters(CImg<unsigned char>& gridded_img,
 
 					std::vector<double> result_values;
 
-					nnet.feedForward(network_input);
-					nnet.getResults(result_values);
+					nnet.feed_forward(network_input);
+					nnet.get_results(result_values);
 	
 					for (auto& output : result_values) {
 						results << output << ' ';
@@ -316,30 +289,28 @@ void train_network(std::string data_filename, Net& nnet) {
 			//TODO::DO NOT CONVERT HERE, JUST USE STRING COMPARISON!!!!!!!!!!!!!!!!!!!!!!!!!1
 			for (auto& it : input_line) {
 				if (!((it) == '\n')){
-					int value = ((int)it -'0');
-					if (value == 1) {
-						input_values.push_back(0.5);
+					if (it == '1') {
+						input_values.push_back(1.0);
 					}
 					else {
-						input_values.push_back(-0.5);
+						input_values.push_back(-1.0);
 					}
 				}
 			}
 
 			for (auto& it : output_line) {
 				if (!((it) == '\n')){
-					int value = ((int)it -'0');
-					if (value == 1) {
-						target_values.push_back(0.5);
+					if (it == '1') {
+						target_values.push_back(1.0);
 					}
 					else {
-						target_values.push_back(-0.5);
+						target_values.push_back(-1.0);
 					}
 				}
 			}
 			//////////////////////////////////////////////////////////////////////////////////////////
-			nnet.feedForward(input_values);
-			nnet.backProp(target_values);
+			nnet.feed_forward(input_values);
+			nnet.backpropogate(target_values);
 			input_values.clear();
 			target_values.clear();
 		}
@@ -408,10 +379,8 @@ void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 		for (auto& file : images) {
 			CImg<unsigned char> image(file.c_str());
 			CImg<unsigned char> letter(image.width(), image.height(), image.depth(), 1);
-			convert_to_greyscale(image, letter);
-			convert_to_binary(letter, return_otsu_threshold(letter)); 
-			crop_empty_space(letter, 0, 0);
 			letter.resize(letter_dimension, letter_dimension, -100, -100, 5);
+			convert_to_greyscale(image, letter);
 			convert_to_binary(letter, return_otsu_threshold(letter)); 
 
 			std::stringstream namesave;
