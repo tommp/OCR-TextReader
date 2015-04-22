@@ -158,7 +158,6 @@ void close_image(CImg<unsigned char>& target_image, const STRMask& mask) {
 void open_image(CImg<unsigned char>& target_image, const STRMask& mask) {
 	erode_image(target_image, mask);
 	dialate_image(target_image, mask);
-	
 }
 
 void bottom_hat_trans(CImg<unsigned char>& target_image, const STRMask& mask){
@@ -170,8 +169,6 @@ void bottom_hat_trans(CImg<unsigned char>& target_image, const STRMask& mask){
 			target_image(x,y) -= image(x,y);
 		} 
 	}
-
-
 }
 
 void top_hat_trans(CImg<unsigned char>& target_image, const STRMask& mask){
@@ -195,33 +192,6 @@ void convert_to_binary(CImg<unsigned char>& target_image, int threshold) {
 			}
 		} 
 	} 
-}
-
-CImg<unsigned char> convert_to_static_size(const CImg<unsigned char>& binary_image, int width, int height) {
-	int chunk_x = binary_image.width()/width;
-	int chunk_y = binary_image.height()/height;
-
-	CImg<unsigned char> result(width, height, binary_image.depth(), 1);
-
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < height; y++) {
-			int number_of_positive_pixels = 0;
-			for (int image_x = x*chunk_x; image_x < (x+1)*chunk_x; image_x++) {
-				for (int image_y = y*chunk_y; image_y < y*(chunk_y+1); image_y++) {
-					if (binary_image(image_x,image_y) == 255) {
-						number_of_positive_pixels++;
-					}
-				}
-			}
-			if (number_of_positive_pixels) {
-				result(x,y) = 255;
-			}
-			else{
-				result(x,y) = 0;
-			}
-		}
-	}
-	return result;
 }
 
 void rescale_image(CImg<unsigned char>& image) {

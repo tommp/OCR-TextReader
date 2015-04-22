@@ -57,6 +57,7 @@ public:
 	int x;
 	int y;
 	bool operator <(const Point& p) const {return this->x < p.x;}
+	Point(int n_x, int n_y): x(n_x), y(n_y) {}
 };
 
 /*Header content*/
@@ -261,11 +262,10 @@ void perform_hysteresis(CImg<unsigned char>& edges, CImg<unsigned char>& supress
 	}
 }
 
-
 int return_otsu_threshold(const CImg<unsigned char>& grayscale){
 	int histogram[CImgconsts::levels] = {0};
-	for (int x = 1; x < grayscale.width()-1; x++){
-		for (int y = 1; y < grayscale.height()-1; y++){
+	for (int x = 1; x < grayscale.width(); x++){
+		for (int y = 1; y < grayscale.height(); y++){
 			histogram[grayscale(x,y)]++;
 		}
 	}
@@ -315,6 +315,74 @@ int return_otsu_threshold(const CImg<unsigned char>& grayscale){
 		return threshold;
 	}
 }
+
+void localized_thresholding(CImg<unsigned char>& grayscale, int grid_width, int grid_height) {
+	int stepsize_w = grayscale.width()/grid_width;
+	int stepsize_h = grayscale.height()/grid_height;
+	for (int x = 0; x < grid_width; x++) {
+		for (int y = 0; y < grid_height; y++) {
+			CImg<unsigned char> piece = grayscale.get_crop(x*stepsize_w, 
+				y*stepsize_h, 
+				(x+1)*stepsize_w, (y+1)*stepsize_h);
+			convert_to_binary(piece, return_otsu_threshold(piece));
+			for (int piece_x = 0; piece_x < piece.width(); piece_x++) {
+				for (int piece_y = 0; piece_y < piece.height(); piece_y++) {
+					grayscale(x*stepsize_w + piece_x, y*stepsize_h + piece_y) = piece(piece_x, piece_y);				
+				}
+			}
+		}
+	}
+}
+
+void localized_pooled_thresholding(CImg<unsigned char>& grayscale, int pixel_square, int init_threshold) {
+	int grid_width = grayscale.width()/pixel_square;
+	int grid_height = grayscale.height()/pixel_square;
+	CImg<unsigned char> piece;
+	int threshold = init_threshold;
+	for (int x = 0; x < grid_width; x++) {
+		for (int y = 0; y < grid_height; y++) {
+
+			if ((x == grid_width - 1) && (y == grid_height - 1)) {
+				piece = grayscale.get_crop(x*pixel_square, 
+											y*pixel_square, 
+											grayscale.width(), 
+											grayscale.height());
+			}
+			else if (y == (grid_height - 1)) {
+				piece = grayscale.get_crop(x*pixel_square, 
+											y*pixel_square, 
+											(x+1)*pixel_square, 
+											grayscale.height()-1);//TODO:: FIX THIS; SAME AS IN CROPPER!
+			}
+			else if (x == (grid_width - 1)) {
+				piece = grayscale.get_crop(x*pixel_square, 
+											y*pixel_square, 
+											grayscale.width(), 
+											(y+1)*pixel_square);
+			}
+			else {
+				piece = grayscale.get_crop(x*pixel_square, 
+											y*pixel_square, 
+											(x+1)*pixel_square, 
+											(y+1)*pixel_square);
+			}
+			if (threshold == -1) {
+				threshold = return_otsu_threshold(piece);
+			}
+			else {
+				threshold += return_otsu_threshold(piece);
+				threshold /= 2;
+			}
+			convert_to_binary(piece, threshold);
+			for (int piece_x = 0; piece_x < piece.width(); piece_x++) {
+				for (int piece_y = 0; piece_y < piece.height(); piece_y++) {
+					grayscale(x*pixel_square + piece_x, y*pixel_square + piece_y) = piece(piece_x, piece_y);				
+				}
+			}
+		}
+	}
+}
+
 
 /* Consider replacing with vector or dynarray (std) or put it in a class with its respective variables */
 double** return_gaussian_kernel(int kernel_size, double sigma){

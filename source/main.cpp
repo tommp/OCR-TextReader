@@ -91,6 +91,41 @@ int main(int argc, char** argv){
 			}
 		}
 	}
+	else if(argv[1][0] == 'z') {
+		if (argc < 3) {
+			std::cout << "Invalid number of threshold inputs: " << argc << std::endl;
+			return -1;
+		}
+		clock_t t1,t2,t3,t4;
+		t1 = clock();
+
+		CImg<unsigned char> image(argv[2]);
+		std::cout<<"Restoring weights..."<<std::endl;
+		nnet.load_weights("weights.txt");
+		std::cout<<"Weights restored, commencing processing!"<<std::endl;
+
+		rescale_image(image);
+		
+	    t2=clock();
+	    std::cout<<"Runtime of image loading and resizing: "<<((float)t2-(float)t1)/CLOCKS_PER_SEC<<std::endl;
+	    
+	    CImg<unsigned char> grayscale(image.width(), image.height(), image.depth(), 1, 255);
+	    convert_to_greyscale(image, grayscale);
+
+	    localized_pooled_thresholding(grayscale, 200, -1);
+
+		t3=clock();
+		std::cout<<"Runtime of binary conversion: "<<((float)t3-(float)t2)/CLOCKS_PER_SEC<<std::endl;
+
+	 	std::cout << "Average line height: " << calculate_row_height(grayscale, 0) << " pixels" << std::endl;
+		segment_letters(grayscale, 0);
+
+		t4=clock();
+		std::cout<<"Runtime of image segmentation and reading: "<<((float)t4-(float)t3)/CLOCKS_PER_SEC<<std::endl;
+		std::cout<<"Runtime in total: "<<((float)t4-(float)t1)/CLOCKS_PER_SEC<<std::endl;
+
+		(image, grayscale).display("Thresholding detection", false);
+	}
 	else if(argv[1][0] == 'c') {
 		if (argc < 3) {
 			std::cout << "Invalid number of canny inputs: " << argc << std::endl;
@@ -100,26 +135,24 @@ int main(int argc, char** argv){
 		t1 = clock();
 
 		CImg<unsigned char> image(argv[2]);
+		std::cout<<"Restoring weights..."<<std::endl;
+		nnet.load_weights("weights.txt");
+		std::cout<<"Weights restored, commencing processing!"<<std::endl;
+
 		rescale_image(image);
 		
 	    t2=clock();
 	    std::cout<<"Runtime of image loading and resizing: "<<((float)t2-(float)t1)/CLOCKS_PER_SEC<<std::endl;
+	    
 	    CImg<unsigned char> edges(image.width(), image.height(), image.depth(), 1);
 		run_canny_edge_detection(image, edges, CImgconsts::GAUSSIAN_SIZE, CImgconsts::GAUSSIAN_SIGMA, CImgconsts::HIGH_THRESHOLD_SCALE);
 
 		t3=clock();
 		std::cout<<"Runtime of canny edge detector: "<<((float)t3-(float)t2)/CLOCKS_PER_SEC<<std::endl;
 
-		std::vector<int> vertical_line_indexes;
+	 	crop_empty_space(edges, 255);
 
-		std::cout<<"Restoring weights..."<<std::endl;
-		nnet.load_weights("weights.txt");
-		std::cout<<"Weights restored, commencing reading!"<<std::endl;
-
-		crop_empty_space(edges, 255, 0);
-		create_grid_separation(edges, vertical_line_indexes, 155, 255, 0);
-
-		segment_letters(edges, vertical_line_indexes, 155);
+		segment_letters(edges, 255);
 		//read_letters(edges, vertical_line_indexes, 155, nnet, topology, "read_text.txt");
 
 		t4=clock();
@@ -144,22 +177,19 @@ int main(int argc, char** argv){
 
 	    CImg<unsigned char> grayscale(image.width(), image.height(), image.depth(), 1);
 	    convert_to_greyscale(image, grayscale);
-	 	STRMask mask("tophatmask.txt");
+	 	STRMask mask("morphology_masks/tophatmask_7x7.txt");
 	    bottom_hat_trans(grayscale, mask);
 	    convert_to_binary(grayscale, return_otsu_threshold(grayscale));
 	    t3=clock();
 	    std::cout<<"Runtime of bottom hat transform: "<<((float)t3-(float)t2)/CLOCKS_PER_SEC<<std::endl;
 
-	    std::vector<int> vertical_line_indexes;
-
-	    crop_empty_space(grayscale, 255, 0);
-	    create_grid_separation(grayscale, vertical_line_indexes, 155, 255, 0);
-		segment_letters(grayscale, vertical_line_indexes, 155);
-		//read_letters(grayscale, vertical_line_indexes, 155, nnet, topology, "read_text.txt");
+		segment_letters(grayscale, 0);
 		t4=clock();
 
 		std::cout<<"Runtime of image segmentation and reading: "<<((float)t4-(float)t3)/CLOCKS_PER_SEC<<std::endl;
 		std::cout<<"Runtime in total: "<<((float)t4-(float)t1)/CLOCKS_PER_SEC<<std::endl;
+
+		(image, grayscale).display("Top hat detection", false);
 	}
 	else {
 		std::cout << "Invalid input!" << std::endl;

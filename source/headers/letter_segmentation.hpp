@@ -23,17 +23,57 @@
 namespace seg_consts {
 	const int num_inputs = 1024;
 	const std::string folder_path = "../data/SD19/HSF_0/*";
+	const int min_dim = 4;
+	const int max_dim = 200;
 }
 
 /*Header content*/
 /*=============================================*/
 using namespace cimg_library;
 
+int calculate_row_height(CImg<unsigned char>& binary_img, char pos_value) {
+	int width = binary_img.width();
+	int height = binary_img.height();
+	bool prev_was_gridline = false;
+	bool prev_was_letter = false;
+	int prev_line_start = 0;
+	int prev_line_end = 0;
+	int avg_line_height = 0;
+
+	for (int y = 0; y < height; y++) {
+		for (int x = 5; x < width; x++) {//TODO::MORE DUMB STUFF DUE TO BAD BORDER HANDLING, FIX LATER
+			if (binary_img(x,y) == pos_value) {
+ 				prev_was_gridline = false;
+ 				if (!prev_was_letter) {
+ 					prev_line_start = y;
+ 					prev_was_letter = true;
+ 				}
+				break;
+			}
+			else if (x == width-1 && !prev_was_gridline) {
+				prev_was_gridline = true;
+				prev_was_letter = false;
+				prev_line_end = y;
+				if (prev_line_start == 0) {
+					avg_line_height = prev_line_end - prev_line_start;
+				}
+				else {
+					avg_line_height += prev_line_end - prev_line_start;
+					avg_line_height /= 2;
+				}
+				for (int x_draw = 0; x_draw < width; x_draw++) {
+					binary_img(x_draw,y) = 125;
+				}
+			}
+		}
+	}
+	return avg_line_height;
+}
+
 void create_grid_separation(CImg<unsigned char>& binary_img, 
 							std::vector<int>& vertical_line_indexes,
 							unsigned char grid_value, 
-							unsigned char plus_value, 
-							int border) {
+							unsigned char plus_value) {
 
 	int width = binary_img.width();
 	int height = binary_img.height();
@@ -42,8 +82,8 @@ void create_grid_separation(CImg<unsigned char>& binary_img,
 	vertical_line_indexes.clear();
 	vertical_line_indexes.push_back(0);
 
-	for (int y = border; y < height - border; y++) {
-		for (int x = border; x < width; x++) {
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
 			if (binary_img(x,y) == plus_value) {
 				prev_was_gridline = false;
 				break;
@@ -51,19 +91,19 @@ void create_grid_separation(CImg<unsigned char>& binary_img,
 			else if (x == width-1 && !prev_was_gridline) {
 				prev_was_gridline = true;
 				vertical_line_indexes.push_back(y);
-				for (int x_draw = border; x_draw < width - border; x_draw++) {
+				for (int x_draw = 0; x_draw < width; x_draw++) {
 					binary_img(x_draw,y) = grid_value;
 				}
 			}
 		}
 	}
 	for (std::vector<int>::iterator it = vertical_line_indexes.begin(); it != vertical_line_indexes.end(); ++it) {
-		for (int x = border; x < width - border; x++) {
-			for (int y = *it+1; y < height - border; y++) {
+		for (int x = 0; x < width; x++) {
+			for (int y = *it+1; y < height; y++) {
 				if (binary_img(x,y) == plus_value) {
 					break;
 				}
-				else if (binary_img(x,y) == grid_value || y == (height - border - 1)) {
+				else if (binary_img(x,y) == grid_value || y == (height - 1)) {
 					for (int y_draw = *it; y_draw < y; y_draw++) {
 						binary_img(x,y_draw) = grid_value;
 					}
@@ -74,7 +114,9 @@ void create_grid_separation(CImg<unsigned char>& binary_img,
 	}
 }
 
-void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value, int border) {
+
+//THIS IS BROKEN, FIX LATER
+void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value) {
 	int width = binary_img.width();
 	int height = binary_img.height();
 
@@ -83,8 +125,8 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value,
 	int x_right_crop = width;
 	int y_bottom_crop = height;
 
-	for (int x = border; x < width - border; x++) {
-		for (int y = border; y < height - border; y++) {
+	for (int x = 0; x < width; x++) {
+		for (int y = 0; y < height; y++) {
 			if (binary_img(x,y) == plus_value) {
 				x_left_crop = x;
 				goto x_right;
@@ -93,8 +135,8 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value,
 	}
 
 	x_right:
-	for (int x = width - border; x > border; x--) {
-		for ( int y = border; y < height - border; y++) {
+	for (int x = width; x > 0; x--) {
+		for ( int y = 0; y < height; y++) {
 			if (binary_img(x,y) == plus_value) {
 				x_right_crop = x;
 				goto y_top;
@@ -104,8 +146,8 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value,
 
 	y_top:
 
-	for (int y = border; y < height - border; y++) {
-		for ( int x = border; x < width - border; x++) {
+	for (int y = 0; y < height; y++) {
+		for ( int x = 0; x < width; x++) {
 			if (binary_img(x,y) == plus_value) {
 				y_top_crop = y;
 				goto y_bottom;
@@ -115,9 +157,8 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value,
 
 	y_bottom:
 
-	//TODO::BUGGED HERE; FIND OUT WHY -1 IS NECESSARY, CANT FIND ANY ARTIFACTS!!!!!!!
-	for (int y = height - border-1; y > border-1; y--) {
-		for ( int x = border; x < width - border; x++) {
+	for (int y = height; y > 0; y--) {
+		for ( int x = 0; x < width; x++) {
 			if (binary_img(x,y) == plus_value) {
 				y_bottom_crop = y;
 				goto end;
@@ -177,8 +218,7 @@ void read_letters(CImg<unsigned char>& gridded_img,
 					}
 
 					CImg<unsigned char> letter = gridded_img.get_crop(x_left, y_top+1, x_right, y_bottom-1);
-					crop_empty_space(letter, 255, 0);
-					letter.resize(letter_dimension, letter_dimension,-100,-100,5);
+					crop_empty_space(letter, 255);
 					for (int i = 0; i < letter.width(); i++) {
 						for (int j = 0; j < letter.height(); j++) {
 							if (letter(i,j)) {
@@ -217,64 +257,6 @@ void read_letters(CImg<unsigned char>& gridded_img,
 		}
 	}
 	results.close();
-}
-
-void segment_letters(CImg<unsigned char>& gridded_img, 
-						std::vector<int>& vertical_line_indexes, 
-						unsigned char grid_value) {
-	int y_top;
-	int y_bottom;
-	int x_left;
-	int x_right;
-	int width = gridded_img.width();
-
-	for (std::vector<int>::iterator it = vertical_line_indexes.begin(); it != vertical_line_indexes.end(); it++) {
-		y_top = *it;
-		if( it+1 == vertical_line_indexes.end()) {
-			y_bottom = gridded_img.height();
-		} 
-		else{
-			y_bottom = *(it+1);
-		}
-
-		x_left = -1;
-		x_right = -1;
-
-		for (int x = 0; x < width; x++) {
-			if ((gridded_img(x, (*it)+4) == grid_value) || 
-				(x == 0 && gridded_img(x, (*it)+4) != grid_value) ||
-				(x == width-1)) {
-				if(x_left == -1) {
-					while((gridded_img(x, (*it)+4) == grid_value) && x < width) {
-						x++;
-					}
-					x_left = x;
-				}
-				else {
-					x_right = x-1;
-					std::ostringstream sstream;
-					sstream << "../data/letters/"<< y_top << "x" << x_left << ".JPG";
-					std::string filename = sstream.str();
-
-					CImg<unsigned char> letter = gridded_img.get_crop(x_left, y_top+1, x_right, y_bottom-1);
-					crop_empty_space(letter, 255, 0);
-					letter.resize(seg_consts::num_inputs, seg_consts::num_inputs,-100,-100,5);
-					for (int i = 0; i < letter.width(); i++) {
-						for (int j = 0; j < letter.height(); j++) {
-							if (letter(i,j)) {
-								letter(i,j) = 255;
-							}
-						}
-					}
-					
-					letter.save(filename.c_str());
-
-					x_left = -1;
-					x_right = -1;
-				}
-			}
-		}
-	}
 }
 
 void train_network(std::string data_filename, Net& nnet) {
@@ -379,7 +361,6 @@ void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 		for (auto& file : images) {
 			CImg<unsigned char> image(file.c_str());
 			CImg<unsigned char> letter(image.width(), image.height(), image.depth(), 1);
-			letter.resize(letter_dimension, letter_dimension, -100, -100, 5);
 			convert_to_greyscale(image, letter);
 			convert_to_binary(letter, return_otsu_threshold(letter)); 
 
@@ -412,6 +393,93 @@ void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 	training_data.close();
 }
 
+void segment_letters(CImg<unsigned char>& binary_img, unsigned char pos_value) {
+
+	int number_of_too_small_objects = 0;
+	int number_of_too_big_objects = 0;
+
+	CImg<unsigned char> mask(binary_img.width(), binary_img.height(), binary_img.depth(), 1, 0);
+	std::vector<Point> queue;
+	for (int x = 0; x < binary_img.width(); x++) {
+		for (int y = 0; y < binary_img.height(); y++) {
+			if((binary_img(x, y) == pos_value) && (mask(x, y) != 1)) {
+				int max_x = x;
+				int max_y = y;
+				int min_x = x;
+				int min_y = y;
+				queue.push_back(Point(x, y));
+				mask(x, y) = 1;
+				while (!queue.empty()) {
+					Point current = queue.back();
+					queue.pop_back();
+					if (current.x < min_x) {
+						min_x = current.x;
+					}
+					else if (current.x > max_x) {
+						max_x = current.x;
+					}
+					if (current.y < min_y) {
+						min_y = current.y;
+					}
+					else if (current.y > max_y) {
+						max_y = current.y;
+					}
+					for (int x_inner = -1; x_inner < 2; x_inner++) {
+						for (int y_inner = -1; y_inner < 2; y_inner++) {
+							if((x_inner + current.x < 0) || 
+								(y_inner + current.y < 0) || 
+								(x_inner + current.x > binary_img.width()) || 
+								(y_inner + current.y > binary_img.height())) {
+								continue;
+							}
+							else if ( x_inner == 0 && y_inner == 0) {
+								continue;
+							}
+							else {
+								if ((binary_img(current.x + x_inner, current.y + y_inner) == pos_value) && 
+													(mask(current.x + x_inner, current.y + y_inner) != 1)) {
+									mask(current.x + x_inner, current.y + y_inner) = 1;
+									queue.push_back(Point(current.x + x_inner, current.y + y_inner));
+								}
+							}
+						}
+					}
+				}
+				if (((max_x - min_x) < seg_consts::min_dim) || ((max_y - min_y) < seg_consts::min_dim)) {
+					number_of_too_small_objects++;
+					continue;
+				}
+				else if (((max_x - min_x) > seg_consts::max_dim) || ((max_y - min_y) > seg_consts::max_dim)) {
+					number_of_too_big_objects++;
+					continue;
+				}
+				else{
+					CImg<unsigned char> letter = binary_img.get_crop(min_x, min_y, max_x, max_y);
+					for (int i = min_x; i < max_x; i++) {
+						binary_img(i, min_y) = 120;
+						binary_img(i, max_y) = 120;
+					}
+					for (int i = min_y; i < max_y; i++) {
+						binary_img(min_x, i) = 120;
+						binary_img(max_x, i) = 120;
+					}
+					std::ostringstream sstream;
+					sstream << "../data/letters/"<< min_x << "x" << min_y << ".JPG";
+					std::string filename = sstream.str();
+					letter.save(filename.c_str());
+				}
+			}
+		}
+	}
+	std::cout << "Segmentation finished!" << std::endl;
+	std::cout << "Number og objects elected too small to segment: " << 
+				number_of_too_small_objects << std::endl;
+	std::cout << "Number og objects elected too big to segment: " << 
+				number_of_too_big_objects << std::endl;
+	if (number_of_too_small_objects || number_of_too_big_objects) {
+		std::cout << "Increase thresholds for object size to segment all objects" << std::endl;
+	}
+}
 
 /*=============================================*/
 
