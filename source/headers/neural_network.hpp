@@ -35,16 +35,14 @@ namespace ANNconsts {
 	const double recent_average_smoothing_factor = 10000.0; // Number of training samples to average over
 }
 
-struct Connection
-{
-	double weight;
-	double deltaWeight;
-};
-
-
 class Neuron;
 
 typedef vector<Neuron> Layer;
+
+struct Connection {
+	double weight;
+	double deltaWeight;
+};
 
 class Neuron {
 	private:
@@ -83,8 +81,7 @@ class Net {
 		int load_weights(std::string filename);
 };
 
-void Neuron::update_input_weights(Layer &previous_layer)
-{
+void Neuron::update_input_weights(Layer &previous_layer) {
 	for (unsigned n = 0; n < previous_layer.size(); ++n) {
 		Neuron &neuron = previous_layer[n];
 		double oldDeltaWeight = neuron.m_output_weights[m_my_index].deltaWeight;
@@ -98,11 +95,8 @@ void Neuron::update_input_weights(Layer &previous_layer)
 	}
 }
 
-double Neuron::calculate_DOW(const Layer &next_layer) const
-{
+double Neuron::calculate_DOW(const Layer &next_layer) const {
 	double sum = 0.0;
-
-	// Sum our contributions of the errors at the nodes we feed.
 
 	for (unsigned n = 0; n < next_layer.size() - 1; ++n) {
 		sum += m_output_weights[n].weight * next_layer[n].m_gradient;
@@ -111,37 +105,28 @@ double Neuron::calculate_DOW(const Layer &next_layer) const
 	return sum;
 }
 
-void Neuron::calculate_hidden_gradients(const Layer &next_layer)
-{
+void Neuron::calculate_hidden_gradients(const Layer &next_layer) {
 	double dow = calculate_DOW(next_layer);
 	m_gradient = dow * Neuron::transfer_function_derivative(m_output_value);
 }
 
-void Neuron::calculate_output_gradients(double target_value)
-{	
+void Neuron::calculate_output_gradients(double target_value) {	
 	double delta = target_value - m_output_value;
 	m_gradient = delta * Neuron::transfer_function_derivative(m_output_value);
 }
 
-double Neuron::transfer_function(double x)
-{
-	// tanh - output range [-1.0..1.0]
+double Neuron::transfer_function(double x) {
 
 	return tanh(x);
 }
 
-double Neuron::transfer_function_derivative(double x)
-{
-	// tanh derivative
+double Neuron::transfer_function_derivative(double x) {
+	/* Hack for faster convergence */
 	return (1.0 - (x * x * x * x * x));
 }
 
-void Neuron::feed_forward(const Layer &previous_layer)
-{
+void Neuron::feed_forward(const Layer &previous_layer) {
 	double sum = 0.0;
-
-	// Sum the previous layer's outputs (which are our inputs)
-	// Include the bias node from the previous layer.
 
 	for (unsigned n = 0; n < previous_layer.size(); ++n) {
 		sum += previous_layer[n].get_output_value() *
@@ -151,8 +136,7 @@ void Neuron::feed_forward(const Layer &previous_layer)
 	m_output_value = Neuron::transfer_function(sum);
 }
 
-Neuron::Neuron(unsigned numOutputs, unsigned my_index)
-{
+Neuron::Neuron(unsigned numOutputs, unsigned my_index) {
 	for (unsigned c = 0; c < numOutputs; ++c) {
 		m_output_weights.push_back(Connection());
 		m_output_weights.back().weight = get_random_weight();
@@ -163,8 +147,7 @@ Neuron::Neuron(unsigned numOutputs, unsigned my_index)
 }
 
 
-void Net::get_results(vector<double> &result_values) const
-{
+void Net::get_results(vector<double> &result_values) const {
 	result_values.clear();
 
 	for (unsigned n = 0; n < m_layers.back().size() - 1; ++n) {
@@ -172,9 +155,7 @@ void Net::get_results(vector<double> &result_values) const
 	}
 }
 
-void Net::backpropogate(const vector<double> &target_values)
-{
-	// Calculate overall net error (RMS of output neuron errors)
+void Net::backpropogate(const vector<double> &target_values) {
 
 	Layer &outputLayer = m_layers.back();
 	m_error = 0.0;
@@ -186,19 +167,13 @@ void Net::backpropogate(const vector<double> &target_values)
 	m_error /= outputLayer.size() - 1; // get average error squared
 	m_error = sqrt(m_error); // RMS
 
-	// Implement a recent average measurement
-
 	m_recent_average_error =
 			(m_recent_average_error * ANNconsts::recent_average_smoothing_factor + m_error)
 			/ (ANNconsts::recent_average_smoothing_factor + 1.0);
 
-	// Calculate output layer gradients
-
 	for (unsigned n = 0; n < outputLayer.size() - 1; ++n) {
 		outputLayer[n].calculate_output_gradients(target_values[n]);
 	}
-
-	// Calculate hidden layer gradients
 
 	for (unsigned layerNum = m_layers.size() - 2; layerNum > 0; --layerNum) {
 		Layer &hiddenLayer = m_layers[layerNum];
@@ -208,9 +183,6 @@ void Net::backpropogate(const vector<double> &target_values)
 			hiddenLayer[n].calculate_hidden_gradients(next_layer);
 		}
 	}
-
-	// For all layers from outputs to first hidden layer,
-	// update connection weights
 
 	for (unsigned layerNum = m_layers.size() - 1; layerNum > 0; --layerNum) {
 		Layer &layer = m_layers[layerNum];
@@ -222,16 +194,13 @@ void Net::backpropogate(const vector<double> &target_values)
 	}
 }
 
-void Net::feed_forward(const vector<double> &input_values)
-{
+void Net::feed_forward(const vector<double> &input_values) {
 	assert(input_values.size() == m_layers[0].size() - 1);
 
-	// Assign (latch) the input values into the input neurons
 	for (unsigned i = 0; i < input_values.size(); ++i) {
 		m_layers[0][i].set_output_value(input_values[i]);
 	}
 
-	// forward propagate
 	for (unsigned layerNum = 1; layerNum < m_layers.size(); ++layerNum) {
 		Layer &previous_layer = m_layers[layerNum - 1];
 		for (unsigned n = 0; n < m_layers[layerNum].size() - 1; ++n) {
@@ -240,8 +209,7 @@ void Net::feed_forward(const vector<double> &input_values)
 	}
 }
 
-Net::Net(const vector<unsigned> &topology)
-{
+Net::Net(const vector<unsigned> &topology) {
 	unsigned numLayers = topology.size();
 	m_recent_average_error = 0;
 	for (unsigned layerNum = 0; layerNum < numLayers; ++layerNum) {
