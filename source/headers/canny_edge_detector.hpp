@@ -307,7 +307,7 @@ int return_otsu_threshold(const CImg<unsigned char>& grayscale){
 		}
 	}
 	if(threshold == -1){
-		std::cout << "Otsu thresholding failed, setting to: " << CImgconsts::levels/2 <<
+		std::cout << " ---Otsu thresholding failed, setting to: " << CImgconsts::levels/2 <<
 		 ", by default." << std::endl;
 		return CImgconsts::levels/2;
 	}
@@ -337,46 +337,51 @@ void localized_thresholding(CImg<unsigned char>& grayscale, int grid_width, int 
 void localized_pooled_thresholding(CImg<unsigned char>& grayscale, int pixel_square, int init_threshold) {
 	int grid_width = grayscale.width()/pixel_square;
 	int grid_height = grayscale.height()/pixel_square;
-	CImg<unsigned char> piece;
-	int threshold = init_threshold;
-	for (int x = 0; x < grid_width; x++) {
-		for (int y = 0; y < grid_height; y++) {
+	if (grid_width == 0 && grid_height == 0) {
+		convert_to_binary(grayscale, return_otsu_threshold(grayscale));
+	}
+	else{
+		CImg<unsigned char> piece;
+		int threshold = init_threshold;
+		for (int x = 0; x < grid_width; x++) {
+			for (int y = 0; y < grid_height; y++) {
 
-			if ((x == grid_width - 1) && (y == grid_height - 1)) {
-				piece = grayscale.get_crop(x*pixel_square, 
-											y*pixel_square, 
-											grayscale.width(), 
-											grayscale.height());
-			}
-			else if (y == (grid_height - 1)) {
-				piece = grayscale.get_crop(x*pixel_square, 
-											y*pixel_square, 
-											(x+1)*pixel_square, 
-											grayscale.height()-1);//TODO:: FIX THIS; SAME AS IN CROPPER!
-			}
-			else if (x == (grid_width - 1)) {
-				piece = grayscale.get_crop(x*pixel_square, 
-											y*pixel_square, 
-											grayscale.width(), 
-											(y+1)*pixel_square);
-			}
-			else {
-				piece = grayscale.get_crop(x*pixel_square, 
-											y*pixel_square, 
-											(x+1)*pixel_square, 
-											(y+1)*pixel_square);
-			}
-			if (threshold == -1) {
-				threshold = return_otsu_threshold(piece);
-			}
-			else {
-				threshold += return_otsu_threshold(piece);
-				threshold /= 2;
-			}
-			convert_to_binary(piece, threshold);
-			for (int piece_x = 0; piece_x < piece.width(); piece_x++) {
-				for (int piece_y = 0; piece_y < piece.height(); piece_y++) {
-					grayscale(x*pixel_square + piece_x, y*pixel_square + piece_y) = piece(piece_x, piece_y);				
+				if ((x == grid_width - 1) && (y == grid_height - 1)) {
+					piece = grayscale.get_crop(x*pixel_square, 
+												y*pixel_square, 
+												grayscale.width(), 
+												grayscale.height());
+				}
+				else if (y == (grid_height - 1)) {
+					piece = grayscale.get_crop(x*pixel_square, 
+												y*pixel_square, 
+												(x+1)*pixel_square, 
+												grayscale.height()-1);//TODO:: FIX THIS; SAME AS IN CROPPER!
+				}
+				else if (x == (grid_width - 1)) {
+					piece = grayscale.get_crop(x*pixel_square, 
+												y*pixel_square, 
+												grayscale.width(), 
+												(y+1)*pixel_square);
+				}
+				else {
+					piece = grayscale.get_crop(x*pixel_square, 
+												y*pixel_square, 
+												(x+1)*pixel_square, 
+												(y+1)*pixel_square);
+				}
+				if (threshold == -1) {
+					threshold = return_otsu_threshold(piece);
+				}
+				else {
+					threshold += return_otsu_threshold(piece);
+					threshold /= 2;
+				}
+				convert_to_binary(piece, threshold);
+				for (int piece_x = 0; piece_x < piece.width(); piece_x++) {
+					for (int piece_y = 0; piece_y < piece.height(); piece_y++) {
+						grayscale(x*pixel_square + piece_x, y*pixel_square + piece_y) = piece(piece_x, piece_y);				
+					}
 				}
 			}
 		}

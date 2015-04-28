@@ -25,6 +25,9 @@ namespace seg_consts {
 	const std::string folder_path = "../data/SD19/HSF_0/*";
 	const int min_dim = 4;
 	const int max_dim = 200;
+	const int num_samples = 350;
+	const int box_color = 120;
+	const unsigned int error_print_rate = 60;
 }
 
 /*Header content*/
@@ -114,9 +117,7 @@ void create_grid_separation(CImg<unsigned char>& binary_img,
 	}
 }
 
-
-//THIS IS BROKEN, FIX LATER
-void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value) {
+void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value, int border) {
 	int width = binary_img.width();
 	int height = binary_img.height();
 
@@ -125,8 +126,8 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value)
 	int x_right_crop = width;
 	int y_bottom_crop = height;
 
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < height; y++) {
+	for (int x = border; x < width - border; x++) {
+		for (int y = border; y < height - border; y++) {
 			if (binary_img(x,y) == plus_value) {
 				x_left_crop = x;
 				goto x_right;
@@ -135,8 +136,8 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value)
 	}
 
 	x_right:
-	for (int x = width; x > 0; x--) {
-		for ( int y = 0; y < height; y++) {
+	for (int x = width - border; x > border; x--) {
+		for ( int y = border; y < height - border; y++) {
 			if (binary_img(x,y) == plus_value) {
 				x_right_crop = x;
 				goto y_top;
@@ -146,8 +147,8 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value)
 
 	y_top:
 
-	for (int y = 0; y < height; y++) {
-		for ( int x = 0; x < width; x++) {
+	for (int y = border; y < height - border; y++) {
+		for ( int x = border; x < width - border; x++) {
 			if (binary_img(x,y) == plus_value) {
 				y_top_crop = y;
 				goto y_bottom;
@@ -157,8 +158,8 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value)
 
 	y_bottom:
 
-	for (int y = height; y > 0; y--) {
-		for ( int x = 0; x < width; x++) {
+	for (int y = height - border; y > border; y--) {
+		for ( int x = border; x < width - border; x++) {
 			if (binary_img(x,y) == plus_value) {
 				y_bottom_crop = y;
 				goto end;
@@ -169,106 +170,16 @@ void crop_empty_space(CImg<unsigned char>& binary_img, unsigned char plus_value)
 	binary_img.crop(x_right_crop, y_top_crop, x_left_crop, y_bottom_crop);
 }
 
-
-void read_letters(CImg<unsigned char>& gridded_img, 
-						std::vector<int>& vertical_line_indexes, 
-						unsigned char grid_value,
-						Net& nnet,
-						const std::vector<unsigned int>& topology,
-						std::string out_file) {
-	int y_top;
-	int y_bottom;
-	int x_left;
-	int x_right;
-	int width = gridded_img.width();
-	std::ofstream results (out_file);
-
-	for (std::vector<int>::iterator it = vertical_line_indexes.begin(); it != vertical_line_indexes.end(); it++) {
-		y_top = *it;
-		if( it+1 == vertical_line_indexes.end()) {
-			y_bottom = gridded_img.height();
-		} 
-		else{
-			y_bottom = *(it+1);
-		}
-
-		x_left = -1;
-		x_right = -1;
-
-		for (int x = 0; x < width; x++) {
-			if ((gridded_img(x, (*it)+4) == grid_value) || 
-				(x == 0 && gridded_img(x, (*it)+4) != grid_value) ||
-				(x == width-1)) {
-				if(x_left == -1) {
-					while((gridded_img(x, (*it)+4) == grid_value) && x < width) {
-						x++;
-					}
-					x_left = x;
-				}
-				else {
-					x_right = x-1;
-
-					int letter_dimension = sqrt(topology[0]);
-
-					if (topology[0] % letter_dimension) {
-						std::cout << "Topology dimension of: " << topology[0] << 
-						" is invalid, must have a whole square root (ex. 100)\n" 
-						<< std::endl;
-						exit(0);
-					}
-
-					CImg<unsigned char> letter = gridded_img.get_crop(x_left, y_top+1, x_right, y_bottom-1);
-					crop_empty_space(letter, 255);
-					for (int i = 0; i < letter.width(); i++) {
-						for (int j = 0; j < letter.height(); j++) {
-							if (letter(i,j)) {
-								letter(i,j) = 255;
-							}
-						}
-					}
-					std::vector<double> network_input;
-					
-					for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
-						for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
-							if (letter(letr_x,letr_y) == 255) {
-								network_input.push_back(1.0);
-							}
-							else {
-								network_input.push_back(0.0);
-							}
-						}
-					}
-
-					std::vector<double> result_values;
-
-					nnet.feed_forward(network_input);
-					nnet.get_results(result_values);
-	
-					for (auto& output : result_values) {
-						results << output << ' ';
-						
-					}
-					results << '\n';
-
-					x_left = -1;
-					x_right = -1;
-				}
-			}
-		}
-	}
-	results.close();
-}
-
 void train_network(std::string data_filename, Net& nnet) {
 	std::ifstream data (data_filename);
 	std::string input_line;
 	std::string output_line;
 	std::vector<double> target_values;
 	std::vector<double> input_values;
+	unsigned int iteration = 0;
 	if(data.is_open()) {
 		while(std::getline(data, input_line)) {
 			std::getline(data, output_line);
-			//TODO::DO NOT CONVERT HERE, JUST USE STRING COMPARISON!!!!!!!!!!!!!!!!!!!!!!!!!1
 			for (auto& it : input_line) {
 				if (!((it) == '\n')){
 					if (it == '1') {
@@ -290,11 +201,14 @@ void train_network(std::string data_filename, Net& nnet) {
 					}
 				}
 			}
-			//////////////////////////////////////////////////////////////////////////////////////////
 			nnet.feed_forward(input_values);
 			nnet.backpropogate(target_values);
 			input_values.clear();
 			target_values.clear();
+			iteration++;
+			if (iteration % seg_consts::error_print_rate == 0) {
+				std::cout <<"Recent average error: " << nnet.get_recent_average_error() << '\r' << std::flush;
+			}
 		}
 	}
 	else {
@@ -326,18 +240,34 @@ std::vector<std::string> split_string(std::string text, std::string delimiter) {
 	return tokens;
 }
 
-void load_symbolmap(std::map<char, std::string>& symbolmap, const std::string& filename){
+void load_symbolmap(std::map<char, std::string>& symbolmap, 
+					std::map<std::vector<int>, char>& valuemap, 
+					const std::string& filename){
 	std::ifstream symbols(filename);
 	std::string line;
 
 	while (getline(symbols, line)){
-		symbolmap[line[0]] = line.substr (1);
+		std::string value = line.substr (1);
+		std::vector<int> value_key;
+
+		for (auto& it : value) {
+			value_key.push_back(it - '0');
+		}
+
+		symbolmap[line[0]] = value;
+		valuemap[value_key] = line[0];
 	}
 }
 
 void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 							std::string filename,
 							std::map<char,std::string>& symbolmap) {
+
+	std::map<char,unsigned int> counter;
+
+	for (auto& it : symbolmap) {
+		counter[it.first] = 0;
+	}
 
 	int letter_dimension = sqrt(topology[0]);
 
@@ -350,6 +280,7 @@ void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 	}
 
 	std::vector<std::string> folders = glob(seg_consts::folder_path);
+	int filenr = 0;
 
 	for (auto& folder : folders) {
 		std::cout << "-- Generating data from folder: " << folder << std::endl;
@@ -357,46 +288,90 @@ void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 		builder << folder << "/HSF_0_*";
 		const std::string image_path = builder.str();
 		std::vector<std::string> images = glob(image_path);
-		int filenr = 0;
 		for (auto& file : images) {
-			CImg<unsigned char> image(file.c_str());
-			CImg<unsigned char> letter(image.width(), image.height(), image.depth(), 1);
-			convert_to_greyscale(image, letter);
-			convert_to_binary(letter, return_otsu_threshold(letter)); 
+			char value = split_string(file, "_")[9][0];
+			if (counter[value] > seg_consts::num_samples) {
+				continue;
+			}
+			else {
+				CImg<unsigned char> image(file.c_str());
+				CImg<unsigned char> letter(image.width(), image.height(), image.depth(), 1);
+				convert_to_greyscale(image, letter);
+				convert_to_binary(letter, return_otsu_threshold(letter)); 
+				crop_empty_space(letter, 0, 10);
 
-			std::stringstream namesave;
-			namesave << "../data/letters/" << filenr << ".jpg"; 
-			std::string filename_save = namesave.str();
-			letter.save(filename_save.c_str());
-			filenr ++;
+				letter.resize(letter_dimension, letter_dimension, -100, -100, 5);
 
-			for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
-				for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
-					if (letter(letr_x,letr_y) == 0) {
-						training_data << 1;
-					}
-					else {
-						training_data << 0;
+				convert_to_binary(letter, return_otsu_threshold(letter)); 
+
+				std::stringstream namesave;
+				namesave << "../data/letters/" << filenr << ".jpg"; 
+				std::string filename_save = namesave.str();
+				letter.save(filename_save.c_str());
+				filenr ++;
+			
+				for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
+					for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
+						if (letter(letr_x,letr_y) == 0) {
+							training_data << 1;
+						}
+						else {
+							training_data << 0;
+						}
 					}
 				}
+				
+				training_data << "\n";
+
+				training_data << symbolmap[value];
+
+				std::map<char,unsigned int>::iterator it = counter.find(value);
+				if(it != counter.end()) {
+					counter[value] ++;
+				}
+				else {
+					counter[value] = 1;
+				}
+				
+
+				training_data << "\n";
 			}
-			
-			training_data << "\n";
-
-			char value = split_string(file, "_")[9][0];
-
-			training_data << symbolmap[value];
-
-			training_data << "\n";
 		}
 	}
 	training_data.close();
+	std::cout << " \n================================================= " << std::endl;
+	std::cout << "Training data statistics: " << std::endl;
+
+	for (auto& it : counter) {
+		std::cout << it.first << " count: " << it.second << std::endl;
+	}
+
+	std::cout << " =================================================\n " << std::endl;
+
 }
 
-void segment_letters(CImg<unsigned char>& binary_img, unsigned char pos_value) {
+void read_letters(CImg<unsigned char>& binary_img, 
+					Net& nnet,
+					unsigned char pos_value, 
+					std::string out_file, 
+					const std::vector<unsigned int>& topology,
+					std::map<std::vector<int>, char>& valuemap,
+					bool draw_boxes,
+					bool save_object,
+					bool read) {
 
 	int number_of_too_small_objects = 0;
 	int number_of_too_big_objects = 0;
+	int letter_number = 0;
+	std::ofstream results (out_file);
+
+	int letter_dimension = sqrt(topology[0]);
+	if (topology[0] % letter_dimension) {
+		std::cout << "Topology dimension of: " << topology[0] << 
+		" is invalid, must have a whole square root (ex. 100)\n" 
+		<< std::endl;
+		exit(0);
+	}
 
 	CImg<unsigned char> mask(binary_img.width(), binary_img.height(), binary_img.depth(), 1, 0);
 	std::vector<Point> queue;
@@ -454,31 +429,75 @@ void segment_letters(CImg<unsigned char>& binary_img, unsigned char pos_value) {
 					continue;
 				}
 				else{
+					letter_number++;
 					CImg<unsigned char> letter = binary_img.get_crop(min_x, min_y, max_x, max_y);
-					for (int i = min_x; i < max_x; i++) {
-						binary_img(i, min_y) = 120;
-						binary_img(i, max_y) = 120;
+					letter.resize(letter_dimension, letter_dimension, -100, -100, 5);
+					convert_to_binary(letter, return_otsu_threshold(letter)); 
+					if (read) {
+						std::vector<double> network_input;
+						
+						for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
+							for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
+								if (letter(letr_x,letr_y) == pos_value) {
+									network_input.push_back(1.0);
+								}
+								else {
+									network_input.push_back(-1.0);
+								}
+							}
+						}
+
+						std::vector<double> result_values;
+
+						nnet.feed_forward(network_input);
+						nnet.get_results(result_values);
+						int vector_index = 0;
+
+						std::vector<int> result_key(result_values.size(), 0);
+
+						for (auto& output : result_values) {
+							if(output > 0){
+								result_key[vector_index] = 1;
+								results << valuemap[result_key] << ", ";
+								result_key[vector_index] = 0;
+							}
+							vector_index++;
+						}
+
+						results << '\n';
+						
+						
 					}
-					for (int i = min_y; i < max_y; i++) {
-						binary_img(min_x, i) = 120;
-						binary_img(max_x, i) = 120;
+					if (save_object) {
+						std::ostringstream sstream;
+						sstream << "../data/letters/"<< letter_number << ".JPG";
+						std::string filename = sstream.str();
+						letter.save(filename.c_str());
 					}
-					std::ostringstream sstream;
-					sstream << "../data/letters/"<< min_x << "x" << min_y << ".JPG";
-					std::string filename = sstream.str();
-					letter.save(filename.c_str());
+					if (draw_boxes) {
+						for (int i = min_x; i < max_x; i++) {
+							binary_img(i, min_y) = seg_consts::box_color;
+							binary_img(i, max_y) = seg_consts::box_color;
+						}
+						for (int i = min_y; i < max_y; i++) {
+							binary_img(min_x, i) = seg_consts::box_color;
+							binary_img(max_x, i) = seg_consts::box_color;
+						}
+					}
 				}
 			}
 		}
 	}
-	std::cout << "Segmentation finished!" << std::endl;
-	std::cout << "Number og objects elected too small to segment: " << 
+	results.close();
+	std::cout << "\n======== Reading finished! ======== " << std::endl;
+	std::cout << "Number og objects elected too small to process: " << 
 				number_of_too_small_objects << std::endl;
-	std::cout << "Number og objects elected too big to segment: " << 
+	std::cout << "Number og objects elected too big to process: " << 
 				number_of_too_big_objects << std::endl;
 	if (number_of_too_small_objects || number_of_too_big_objects) {
-		std::cout << "Increase thresholds for object size to segment all objects" << std::endl;
+		std::cout << "Increase thresholds for object size to process all objects" << std::endl;
 	}
+	std::cout << "===================================\n " << std::endl;
 }
 
 /*=============================================*/

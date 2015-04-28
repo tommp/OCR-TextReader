@@ -30,9 +30,9 @@ using namespace cimg_library;
 /*Header content*/
 /*=============================================*/
 namespace ANNconsts {
-	const double eta = 0.1; // 0.0 = slow learner, 0.2 = medium learner, 1.0 = recless learner
+	const double eta = 0.05; // 0.0 = slow learner, 0.2 = medium learner, 1.0 = recless learner
 	const double alpha = 0.25; //0.0  = no mometum, 0.5 = moderate momentum
-	const double recent_average_smoothing_factor = 10000.0; // Number of training samples to average over
+	const double recent_average_smoothing_factor = 5000.0; // Number of training samples to average over
 }
 
 class Neuron;
@@ -121,8 +121,7 @@ double Neuron::transfer_function(double x) {
 }
 
 double Neuron::transfer_function_derivative(double x) {
-	/* Hack for faster convergence */
-	return (1.0 - (x * x * x * x * x));
+	return (1.0 - (x * x * x * x));//Hack, use scaling instead
 }
 
 void Neuron::feed_forward(const Layer &previous_layer) {
