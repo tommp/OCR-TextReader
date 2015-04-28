@@ -18,11 +18,15 @@ int main(int argc, char** argv){
 	Net nnet(topology);
 
 	std::map<char, std::string> symbolmap;
-	load_symbolmap(symbolmap, "letter_values.txt");
+	std::map<std::vector<int>, char> valuemap;
+	std::map<char,std::vector<unsigned int>> template_histogram;
+
+	load_symbolmap(symbolmap, valuemap, "letter_values.txt");
+	load_templates(template_histogram, "template_data.txt");
 
 	if (argv[1][0] == 'g') {
 		std::cout << "Generating training data from SD19 data set, this could take a while..." << std::endl;
-		generate_training_data_SD19(topology, "training_data.txt", symbolmap);
+		generate_training_data_SD19(topology, "training_data.txt", "template_data.txt", symbolmap);
 		std::cout << "Training data generated!" << std::endl;
 	}
 	else if (argv[1][0] == 'w'){
@@ -45,19 +49,13 @@ int main(int argc, char** argv){
 					inputVals.push_back(1.0);
 				}
 				else {
-					inputVals.push_back(0.0);
+					inputVals.push_back(-1.0);
 				}
 			}
 			nnet.feed_forward(inputVals);
 			nnet.get_results(resultVals);
 			for(auto& it : resultVals) {
-				if (it < 0) {
-					outfile << 0 << ',';
-				}
-				else {
-					outfile << 1 << ',';
-				}
-				
+				outfile << it << ", ";
 			}
 			outfile << "\n";
 		}
@@ -118,7 +116,7 @@ int main(int argc, char** argv){
 		std::cout<<"Runtime of binary conversion: "<<((float)t3-(float)t2)/CLOCKS_PER_SEC<<std::endl;
 
 	 	std::cout << "Average line height: " << calculate_row_height(grayscale, 0) << " pixels" << std::endl;
-		segment_letters(grayscale, 0);
+	 	read_letters(grayscale, nnet, 0, "results.txt", topology, valuemap, template_histogram, true, true, true);
 
 		t4=clock();
 		std::cout<<"Runtime of image segmentation and reading: "<<((float)t4-(float)t3)/CLOCKS_PER_SEC<<std::endl;
@@ -150,10 +148,9 @@ int main(int argc, char** argv){
 		t3=clock();
 		std::cout<<"Runtime of canny edge detector: "<<((float)t3-(float)t2)/CLOCKS_PER_SEC<<std::endl;
 
-	 	crop_empty_space(edges, 255);
+	 	crop_empty_space(edges, 255, 1);
 
-		segment_letters(edges, 255);
-		//read_letters(edges, vertical_line_indexes, 155, nnet, topology, "read_text.txt");
+		read_letters(edges, nnet, 255, "results.txt", topology, valuemap, template_histogram, true, true, true);
 
 		t4=clock();
 		std::cout<<"Runtime of image segmentation and reading: "<<((float)t4-(float)t3)/CLOCKS_PER_SEC<<std::endl;
@@ -183,7 +180,7 @@ int main(int argc, char** argv){
 	    t3=clock();
 	    std::cout<<"Runtime of bottom hat transform: "<<((float)t3-(float)t2)/CLOCKS_PER_SEC<<std::endl;
 
-		segment_letters(grayscale, 0);
+		read_letters(grayscale, nnet, 0, "results.txt", topology, valuemap, template_histogram, true, false, true);
 		t4=clock();
 
 		std::cout<<"Runtime of image segmentation and reading: "<<((float)t4-(float)t3)/CLOCKS_PER_SEC<<std::endl;

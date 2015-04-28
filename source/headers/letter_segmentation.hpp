@@ -261,9 +261,11 @@ void load_symbolmap(std::map<char, std::string>& symbolmap,
 
 void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 							std::string filename,
+							std::string template_filename,
 							std::map<char,std::string>& symbolmap) {
 
 	std::map<char,unsigned int> counter;
+	std::map<char,std::vector<unsigned int>> template_histogram;
 
 	for (auto& it : symbolmap) {
 		counter[it.first] = 0;
@@ -280,7 +282,6 @@ void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 	}
 
 	std::vector<std::string> folders = glob(seg_consts::folder_path);
-	int filenr = 0;
 
 	for (auto& folder : folders) {
 		std::cout << "-- Generating data from folder: " << folder << std::endl;
@@ -302,18 +303,17 @@ void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 
 				letter.resize(letter_dimension, letter_dimension, -100, -100, 5);
 
-				convert_to_binary(letter, return_otsu_threshold(letter)); 
+				if (template_histogram.find(value) == template_histogram.end()) {
+					template_histogram[value] = std::vector<unsigned int> (letter_dimension*letter_dimension, 0);
+				}
 
-				std::stringstream namesave;
-				namesave << "../data/letters/" << filenr << ".jpg"; 
-				std::string filename_save = namesave.str();
-				letter.save(filename_save.c_str());
-				filenr ++;
+				convert_to_binary(letter, return_otsu_threshold(letter)); 
 			
 				for(int letr_x = 0; letr_x < letter.width(); letr_x++) {
 					for(int letr_y = 0; letr_y < letter.height(); letr_y++) {
 						if (letter(letr_x,letr_y) == 0) {
 							training_data << 1;
+							template_histogram[value][letr_x + letter_dimension*letr_y]++;
 						}
 						else {
 							training_data << 0;
@@ -339,6 +339,18 @@ void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 		}
 	}
 	training_data.close();
+
+	std::ofstream template_data(template_filename);
+
+	for (auto& it : template_histogram) {
+		template_data << it.first << ' ';
+		for (auto& vec_it : it.second) {
+			template_data << vec_it << ' ';
+		}
+		template_data << '\n';
+	}
+	template_data.close();
+
 	std::cout << " \n================================================= " << std::endl;
 	std::cout << "Training data statistics: " << std::endl;
 
@@ -350,12 +362,53 @@ void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 
 }
 
+void load_templates(std::map<char,std::vector<unsigned int>>& template_histogram, std::string filename) {
+	std::ifstream template_data(filename);
+	std::string line;
+	while(getline(template_data, line)) {
+		std::vector<std::string> data = split_string(line, " ");
+		template_histogram[data[0][0]] = std::vector<unsigned int>{};
+		for (std::vector<std::string>::iterator it = ++data.begin(); it != data.end(); it++) {
+			template_histogram[data[0][0]].push_back(std::stoi(*it, nullptr));
+		}
+	}
+
+}
+
+char return_best_template_match(std::vector<char>& letters, 
+								CImg<unsigned char>& letter,
+								std::map<char,std::vector<unsigned int>>& template_histogram,
+								unsigned char pos_value) {
+	char best_symbol = '?';
+	unsigned int best_score = 0;
+	for (auto& it : letters) {
+		unsigned int current_score = 0;
+		unsigned int number_of_matches = 0;
+		unsigned int average_score = 0;
+		for (int x = 0; x < letter.width(); x++) {
+			for (int y = 0; y < letter.height(); y++) {
+				if (letter(x,y) == pos_value) {
+					number_of_matches++;
+					current_score += template_histogram[it][x + y * letter.width()];
+				}
+			}
+		}
+		average_score = current_score / number_of_matches;
+		if (average_score > best_score) {
+			best_score = average_score;
+			best_symbol = it;
+		}
+	}
+	return best_symbol;
+}
+
 void read_letters(CImg<unsigned char>& binary_img, 
 					Net& nnet,
 					unsigned char pos_value, 
 					std::string out_file, 
 					const std::vector<unsigned int>& topology,
 					std::map<std::vector<int>, char>& valuemap,
+					std::map<char,std::vector<unsigned int>>& template_histogram,
 					bool draw_boxes,
 					bool save_object,
 					bool read) {
@@ -451,19 +504,22 @@ void read_letters(CImg<unsigned char>& binary_img,
 
 						nnet.feed_forward(network_input);
 						nnet.get_results(result_values);
+
 						int vector_index = 0;
 
 						std::vector<int> result_key(result_values.size(), 0);
+						std::vector<char> candidate_symbols;
 
 						for (auto& output : result_values) {
 							if(output > 0){
 								result_key[vector_index] = 1;
-								results << valuemap[result_key] << ", ";
+								candidate_symbols.push_back(valuemap[result_key]);
 								result_key[vector_index] = 0;
 							}
 							vector_index++;
 						}
 
+						results << return_best_template_match(candidate_symbols, letter, template_histogram, pos_value);
 						results << '\n';
 						
 						
