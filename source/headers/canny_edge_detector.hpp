@@ -77,6 +77,7 @@ void apply_gaussian_smoothing(CImg<unsigned char>& grayimage, double** gaussian,
 
 	int kernel_offset = kernel_size / 2;
 
+	/* Smooth using the kernel */
 	for (int i = 0; i < grayimage.width(); i++){
 		for (int j = 0; j < grayimage.height(); j++){
 			pixel_sum = 0.0;
@@ -145,6 +146,7 @@ void calculate_gradient_magnitude_and_direction(CImg<unsigned char>& grayimage,
 	}
 }
 
+/* Remove all pixels that are not local maxima */
 void apply_non_maximum_suppress(CImg<unsigned char>& grayimage, 
 								CImg<unsigned char>& direction, 
 								CImg<unsigned char>& magnitude){
@@ -189,6 +191,7 @@ void apply_non_maximum_suppress(CImg<unsigned char>& grayimage,
 	}
 }
 
+/* Recursive function that checks if a pixel is connected to a upper threshold pixel throught other potential pixels */
 bool check_if_a_neghbour_is_upper_threshold(int xpos, 
 											int ypos, 
 											CImg<unsigned char>& supressed,
@@ -228,6 +231,7 @@ bool check_if_a_neghbour_is_upper_threshold(int xpos,
 	return false;
 }
 
+/* The thresholding method, removes all pixels not likeley to be part of the edges */
 void perform_hysteresis(CImg<unsigned char>& edges, CImg<unsigned char>& supressed, int high_threshold){
 	int low_threshold = high_threshold*CImgconsts::LOW_THRESHOLD_SCALE;
 	for (int x = 0; x < supressed.width(); x++){

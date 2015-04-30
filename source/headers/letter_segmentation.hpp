@@ -34,7 +34,7 @@ namespace seg_consts {
 /*=============================================*/
 using namespace cimg_library;
 
-int calculate_row_height(CImg<unsigned char>& binary_img, char pos_value) {
+int calculate_row_height(CImg<unsigned char>& binary_img, char pos_value, std::vector<int>& vertical_line_indexes) {
 	int width = binary_img.width();
 	int height = binary_img.height();
 	bool prev_was_gridline = false;
@@ -67,6 +67,7 @@ int calculate_row_height(CImg<unsigned char>& binary_img, char pos_value) {
 				for (int x_draw = 0; x_draw < width; x_draw++) {
 					binary_img(x_draw,y) = 125;
 				}
+				vertical_line_indexes.push_back(y);
 			}
 		}
 	}
@@ -386,7 +387,7 @@ char return_best_template_match(std::vector<char>& letters,
 	}
 	return best_symbol;
 }
-
+/* TODO:: THIS NEEDS REFACTORING */
 void read_letters(CImg<unsigned char>& binary_img, 
 					Net& nnet,
 					unsigned char pos_value, 
@@ -403,6 +404,12 @@ void read_letters(CImg<unsigned char>& binary_img,
 	int letter_number = 0;
 	std::ofstream results (out_file);
 
+	/* Calculate line separators and average line height */
+	std::vector<int> vertical_line_indexes;
+	int line_offset =  calculate_row_height(binary_img, 0, vertical_line_indexes) / 2;
+	std::cout << "Average line height: " << line_offset*2 << " pixels" << std::endl;
+
+
 	int letter_dimension = sqrt(topology[0]);
 	if (topology[0] % letter_dimension) {
 		std::cout << "Topology dimension of: " << topology[0] << 
@@ -411,17 +418,21 @@ void read_letters(CImg<unsigned char>& binary_img,
 		exit(0);
 	}
 
+	/* Perform segmentation line by line */
 	CImg<unsigned char> mask(binary_img.width(), binary_img.height(), binary_img.depth(), 1, 0);
 	std::vector<Point> queue;
-	for (int x = 0; x < binary_img.width(); x++) {
-		for (int y = 0; y < binary_img.height(); y++) {
-			if((binary_img(x, y) == pos_value) && (mask(x, y) != 1)) {
+	for (auto& y : vertical_line_indexes) {
+		if ((y - line_offset) < 0) {
+			continue;
+		}
+		for (int x = 0; x < binary_img.width(); x++)  {
+			if((binary_img(x, y - line_offset) == pos_value) && (mask(x, y - line_offset) != 1)) {
 				int max_x = x;
-				int max_y = y;
+				int max_y = y - line_offset;
 				int min_x = x;
-				int min_y = y;
-				queue.push_back(Point(x, y));
-				mask(x, y) = 1;
+				int min_y = y - line_offset;
+				queue.push_back(Point(x, y - line_offset));
+				mask(x, y  - line_offset) = 1;
 				while (!queue.empty()) {
 					Point current = queue.back();
 					queue.pop_back();
@@ -458,6 +469,8 @@ void read_letters(CImg<unsigned char>& binary_img,
 						}
 					}
 				}
+
+				/* Check if the object is within the size boundaries */
 				if (((max_x - min_x) < seg_consts::min_dim) || ((max_y - min_y) < seg_consts::min_dim)) {
 					number_of_too_small_objects++;
 					continue;
@@ -466,11 +479,14 @@ void read_letters(CImg<unsigned char>& binary_img,
 					number_of_too_big_objects++;
 					continue;
 				}
+				/* Segment if this is the case */
 				else{
 					letter_number++;
 					CImg<unsigned char> letter = binary_img.get_crop(min_x, min_y, max_x, max_y);
 					letter.resize(letter_dimension, letter_dimension, -100, -100, 5);
 					convert_to_binary(letter, return_otsu_threshold(letter)); 
+
+					/* Classify the character */
 					if (read) {
 						std::vector<double> network_input;
 						
@@ -505,16 +521,17 @@ void read_letters(CImg<unsigned char>& binary_img,
 						}
 
 						results << return_best_template_match(candidate_symbols, letter, template_histogram, pos_value);
-						results << '\n';
 						
 						
 					}
+					/* Save the object */
 					if (save_object) {
 						std::ostringstream sstream;
 						sstream << "../data/letters/"<< letter_number << ".JPG";
 						std::string filename = sstream.str();
 						letter.save(filename.c_str());
 					}
+					/* Draw boundary boxes */
 					if (draw_boxes) {
 						for (int i = min_x; i < max_x; i++) {
 							binary_img(i, min_y) = seg_consts::box_color;
