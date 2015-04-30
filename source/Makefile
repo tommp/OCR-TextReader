@@ -9,7 +9,7 @@ program_OBJS := ${program_CXX_SRCS:.cpp=.o}
 
 program_INCLUDE_DIRS := current_dir ./headers/
 program_LIBRARY_DIRS := /usr/local/lib /usr/X11R6/lib
-program_LIBRARIES :=  m pthread jpeg X11
+program_LIBRARIES :=  m pthread jpeg X11 png
 
 LDFLAGS += $(SDL_LIB)
 CXXFLAGS += -Wall -g -std=c++11

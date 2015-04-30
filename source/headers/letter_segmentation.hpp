@@ -25,7 +25,7 @@ namespace seg_consts {
 	const std::string folder_path = "../data/SD19/HSF_0/*";
 	const int min_dim = 4;
 	const int max_dim = 200;
-	const int num_samples = 350;
+	const int num_samples = 800;
 	const int box_color = 120;
 	const unsigned int error_print_rate = 60;
 }
@@ -73,7 +73,7 @@ int calculate_row_height(CImg<unsigned char>& binary_img, char pos_value) {
 	return avg_line_height;
 }
 
-void create_grid_separation(CImg<unsigned char>& binary_img, 
+void create_horizontal_separation(CImg<unsigned char>& binary_img, 
 							std::vector<int>& vertical_line_indexes,
 							unsigned char grid_value, 
 							unsigned char plus_value) {
@@ -96,21 +96,6 @@ void create_grid_separation(CImg<unsigned char>& binary_img,
 				vertical_line_indexes.push_back(y);
 				for (int x_draw = 0; x_draw < width; x_draw++) {
 					binary_img(x_draw,y) = grid_value;
-				}
-			}
-		}
-	}
-	for (std::vector<int>::iterator it = vertical_line_indexes.begin(); it != vertical_line_indexes.end(); ++it) {
-		for (int x = 0; x < width; x++) {
-			for (int y = *it+1; y < height; y++) {
-				if (binary_img(x,y) == plus_value) {
-					break;
-				}
-				else if (binary_img(x,y) == grid_value || y == (height - 1)) {
-					for (int y_draw = *it; y_draw < y; y_draw++) {
-						binary_img(x,y_draw) = grid_value;
-					}
-					break;
 				}
 			}
 		}
@@ -286,7 +271,7 @@ void generate_training_data_SD19(const std::vector<unsigned int>& topology,
 	for (auto& folder : folders) {
 		std::cout << "-- Generating data from folder: " << folder << std::endl;
 		std::stringstream builder;
-		builder << folder << "/HSF_0_*";
+		builder << folder << "/HSF_*";
 		const std::string image_path = builder.str();
 		std::vector<std::string> images = glob(image_path);
 		for (auto& file : images) {
