@@ -2,18 +2,19 @@
 A C++ application for reading text from images
 
 Run it from the source folder, command structure is: 
-../tr <threshold type> <image file path> <draw boxes> <save objects> <read> 
+../tr <threshold type> <image file path> <localized thresholding section size> <draw boxes> <save objects> <read> 
 
 Options:
 	<threshold type> can be c or z, c runs the canny edge detector, z runs with localized pooled thresholding.
 	<image file path> path to the image to process.
+	<localized thresholding section size> only used if first option is z, sets the size og the smaller sections in pixels.
 	<draw boxes> can be 0 or 1, if 1, draws the boundary boxes on the output image.
 	<save objects> can be 0 or 1, if 1, saves each segmented object in ../data/letters/
 	<read> can be 0 or 1, if 1, reads the segmented leters and stores the result in results.txt
 
 Example command: 
 
-../tr z ../data/hello_world.JPG 1 1 1
+../tr z ../data/hello_world.JPG 60 1 1 1
 
 This will run the system with thrasholding on the image hello_world.JPG stored in ../data/. It will draw the boundary boxes, save each individually segmented symbol in ../data/letters and read the letters, storing the values in results.txt.
 

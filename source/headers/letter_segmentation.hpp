@@ -547,6 +547,17 @@ void read_letters(CImg<unsigned char>& binary_img,
 		}
 	}
 	results.close();
+	if (read) {
+		std::ifstream results (out_file);
+		std::string result_line;
+		std::cout << "\n========== Read results: ==========" << std::endl;
+		while(getline(results, result_line)){
+			std::cout << result_line << std::endl;
+		}
+		std::cout << "===================================" << std::endl;
+		results.close();
+	}
+	
 	std::cout << "\n======== Reading finished! ======== " << std::endl;
 	std::cout << "Number og objects elected too small to process: " << 
 				number_of_too_small_objects << std::endl;
