@@ -1,4 +1,4 @@
-# OCR-TextReader
+# TextReader
 A C++ application for reading text from images
 
 Run it from the source folder, command structure is: 
