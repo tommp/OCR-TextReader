@@ -16,7 +16,7 @@ Example command:
 
 ../tr z ../data/hello_world.JPG 60 1 1 1
 
-This will run the system with thrasholding on the image hello_world.JPG stored in ../data/. It will draw the boundary boxes, save each individually segmented symbol in ../data/letters and read the letters, storing the values in results.txt.
+This will run the system with thresholding on the image hello_world.JPG stored in ../data/. It will draw the boundary boxes, save each individually segmented symbol in ../data/letters and read the letters, storing the values in results.txt.
 
 Specialized commands:
 	../tr g : This will generate training data from the ../data/SD19/HSF_0/F0* folders. Stores the textual representation of the data in training_data.txt.
